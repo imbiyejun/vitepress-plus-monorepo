@@ -1,12 +1,19 @@
-// Config loader - simplified version
+// Config module exports
+export { loadConfig, resolvePath, getTopicsConfigPath, getTopicsDataPath, validateConfig } from './loader.js'
+export { defaultConfig } from './defaults.js'
+export type {
+  VitePressConfig,
+  VitePlusPlusConfig,
+  PathsConfig,
+  TopicsConfig,
+  ArticleStatusConfig,
+  ComponentsConfig,
+  ThemeConfig
+} from './types.js'
 
-import type { VitePressConfig } from '../types'
+// Helper function for defining config
+import type { VitePressConfig } from './types.js'
 
 export function defineConfig(config: VitePressConfig): VitePressConfig {
-  // For now, just return the config as-is
-  // Will implement proper config loading and merging later
   return config
 }
-
-export { VitePressConfig, VitePlusPlusConfig } from '../types'
-
