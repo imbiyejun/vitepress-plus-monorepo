@@ -1,0 +1,51 @@
+{
+  "name": "@imbiyejun/vitepress-admin",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local development tool for managing VitePress Plus projects",
+  "bin": {
+    "vpa": "./bin/vpa.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./config": "./dist/config/index.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "vite",
+    "dev:server": "nodemon --watch server -e ts --exec tsx server/index.ts",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json"
+  },
+  "peerDependencies": {
+    "@imbiyejun/vitepress-plus": "workspace:*"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "vue": "^3.4.0",
+    "ant-design-vue": "^4.0.0",
+    "commander": "^11.0.0",
+    "dotenv": "^16.4.5",
+    "ws": "^8.16.0",
+    "chokidar": "^4.0.3",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.10",
+    "concurrently": "^9.2.0",
+    "nodemon": "^3.1.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  }
+}
+

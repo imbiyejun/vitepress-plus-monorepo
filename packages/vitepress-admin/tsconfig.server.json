@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist/server",
+    "rootDir": "./server",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": ["server/**/*", "config/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+
