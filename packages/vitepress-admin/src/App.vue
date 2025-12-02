@@ -1,17 +1,15 @@
 <template>
-  <div id="app">
-    <h1>VitePress Admin</h1>
-    <p>Frontend implementation coming soon...</p>
-  </div>
+  <router-view></router-view>
 </template>
 
-<script setup lang="ts">
-// App logic will be implemented later
-</script>
+<script setup lang="ts"></script>
 
-<style scoped>
+<style>
+html,
+body,
 #app {
-  padding: 20px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
 </style>
-

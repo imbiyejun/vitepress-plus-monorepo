@@ -1,88 +1,130 @@
-// Article controller for VitePress Admin
-import type { Request, Response } from 'express'
-import type { FileSystemService } from '../services/fileSystem.js'
+import { Request, Response } from 'express'
+// @ts-expect-error - ES module compatibility with workspace package
+import { topicsData } from '@mind-palace/docs/data'
+import { promises as fs } from 'fs'
+import { join } from 'path'
+import { fileURLToPath } from 'url'
+import { sendSuccess, sendError } from '../utils/response'
 
-export function createArticleController(fileSystem: FileSystemService) {
-  return {
-    /**
-     * Get articles in a topic
-     */
-    async getArticles(req: Request, res: Response) {
-      try {
-        const { topicSlug } = req.params
-        const articles = await fileSystem.listArticles(topicSlug)
-        res.json({ success: true, data: articles })
-      } catch (error: any) {
-        console.error('Failed to get articles:', error)
-        res.status(500).json({ success: false, error: error.message })
-      }
-    },
+// Get project root directory
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = join(__filename, '..', '..')
+const PROJECT_ROOT = join(__dirname, '..', '..')
+const ARTICLES_DIR = join(PROJECT_ROOT, 'docs', 'articles')
 
-    /**
-     * Get single article
-     */
-    async getArticle(req: Request, res: Response) {
-      try {
-        const { topicSlug, articleSlug } = req.params
-        const article = await fileSystem.readArticle(topicSlug, articleSlug)
-        
-        if (!article) {
-          res.status(404).json({ success: false, error: 'Article not found' })
-          return
-        }
-        
-        res.json({ success: true, data: article })
-      } catch (error: any) {
-        console.error('Failed to get article:', error)
-        res.status(500).json({ success: false, error: error.message })
-      }
-    },
+export const getTopicArticleList = async (req: Request, res: Response) => {
+  const { topicId } = req.params
+  try {
+    const topicData = topicsData[topicId]
 
-    /**
-     * Create or update article
-     */
-    async saveArticle(req: Request, res: Response) {
-      try {
-        const { topicSlug, articleSlug } = req.params
-        const { article, content } = req.body
-        
-        await fileSystem.writeArticle(topicSlug, articleSlug, article, content)
-        res.json({ success: true, message: 'Article saved successfully' })
-      } catch (error: any) {
-        console.error('Failed to save article:', error)
-        res.status(500).json({ success: false, error: error.message })
-      }
-    },
-
-    /**
-     * Delete article
-     */
-    async deleteArticle(req: Request, res: Response) {
-      try {
-        const { topicSlug, articleSlug } = req.params
-        await fileSystem.deleteArticle(topicSlug, articleSlug)
-        res.json({ success: true, message: 'Article deleted successfully' })
-      } catch (error: any) {
-        console.error('Failed to delete article:', error)
-        res.status(500).json({ success: false, error: error.message })
-      }
-    },
-
-    /**
-     * Rename article
-     */
-    async renameArticle(req: Request, res: Response) {
-      try {
-        const { topicSlug, articleSlug } = req.params
-        const { newSlug } = req.body
-        
-        await fileSystem.renameArticle(topicSlug, articleSlug, newSlug)
-        res.json({ success: true, message: 'Article renamed successfully' })
-      } catch (error: any) {
-        console.error('Failed to rename article:', error)
-        res.status(500).json({ success: false, error: error.message })
-      }
+    if (!topicData) {
+      return sendError(res, '专题不存在', 404)
     }
+
+    interface Chapter {
+      title: string
+      articles: Array<{
+        slug: string
+        title: string
+        status: string
+      }>
+    }
+
+    const articles = (topicData.chapters as Chapter[]).flatMap(chapter =>
+      chapter.articles.map(article => ({
+        id: article.slug,
+        title: article.title,
+        path: `${topicId}/${article.slug}.md`,
+        createTime: new Date().toISOString(),
+        status: article.status,
+        chapterTitle: chapter.title
+      }))
+    )
+
+    sendSuccess(res, { articles })
+  } catch (error) {
+    console.error('获取文章列表失败:', error)
+    sendError(res, '获取文章列表失败', 500)
   }
 }
 
+// Get article content
+export const getArticleContent = async (req: Request, res: Response) => {
+  const { topicSlug, articleSlug } = req.params
+
+  try {
+    const articlePath = join(ARTICLES_DIR, topicSlug, `${articleSlug}.md`)
+
+    // Check if file exists, if not create default content
+    let content = ''
+    try {
+      await fs.access(articlePath)
+      content = await fs.readFile(articlePath, 'utf-8')
+    } catch {
+      // File doesn't exist, create default content
+      const defaultContent = `---
+title: ${articleSlug}
+description: 
+---
+
+# ${articleSlug}
+
+`
+      // Ensure directory exists
+      const topicDir = join(ARTICLES_DIR, topicSlug)
+      try {
+        await fs.access(topicDir)
+      } catch {
+        await fs.mkdir(topicDir, { recursive: true })
+      }
+
+      // Create file with default content
+      await fs.writeFile(articlePath, defaultContent, 'utf-8')
+      content = defaultContent
+    }
+
+    sendSuccess(res, {
+      content,
+      path: `${topicSlug}/${articleSlug}.md`
+    })
+  } catch (error) {
+    console.error('读取文章失败:', error)
+    sendError(res, '读取文章失败', 500)
+  }
+}
+
+// Update article content
+export const updateArticleContent = async (req: Request, res: Response) => {
+  const { topicSlug, articleSlug } = req.params
+  const { content } = req.body
+
+  if (typeof content !== 'string') {
+    return sendError(res, '内容格式不正确', 400)
+  }
+
+  try {
+    const articlePath = join(ARTICLES_DIR, topicSlug, `${articleSlug}.md`)
+
+    // Ensure directory exists
+    const topicDir = join(ARTICLES_DIR, topicSlug)
+    try {
+      await fs.access(topicDir)
+    } catch {
+      await fs.mkdir(topicDir, { recursive: true })
+    }
+
+    // Write content to file (create or update)
+    await fs.writeFile(articlePath, content, 'utf-8')
+
+    sendSuccess(
+      res,
+      {
+        path: `${topicSlug}/${articleSlug}.md`
+      },
+      '保存成功'
+    )
+  } catch (error) {
+    console.error('保存文章失败:', error)
+    sendError(res, '保存文章失败', 500)
+  }
+}
