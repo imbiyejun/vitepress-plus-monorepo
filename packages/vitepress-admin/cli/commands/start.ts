@@ -23,9 +23,12 @@ export function startCommand(): Command {
     .option('-r, --root <root>', 'Project root directory', process.cwd())
     .action(async (options: StartOptions) => {
       const { port = '3000', open: shouldOpen = false, root = process.cwd() } = options
+      
+      // Resolve to absolute path
+      const absoluteRoot = path.resolve(root)
 
       console.log('\n🚀 Starting VitePress Admin...\n')
-      console.log(`📁 Project root: ${root}`)
+      console.log(`📁 Project root: ${absoluteRoot}`)
       console.log(`🌐 Server port: ${port}`)
       console.log('-------------------\n')
 
@@ -44,7 +47,7 @@ export function startCommand(): Command {
           env: {
             ...process.env,
             PORT: port,
-            PROJECT_ROOT: root,
+            PROJECT_ROOT: absoluteRoot,
             NODE_ENV: 'development'
           },
           cwd: packageRoot

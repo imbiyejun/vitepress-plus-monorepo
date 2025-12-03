@@ -7,9 +7,9 @@ import path from 'path'
 export function getProjectRoot(): string {
   const currentDir = process.cwd()
   
-  // Use PROJECT_ROOT if set by CLI
+  // Use PROJECT_ROOT if set by CLI (resolve relative paths)
   if (process.env.PROJECT_ROOT) {
-    return process.env.PROJECT_ROOT
+    return path.resolve(process.env.PROJECT_ROOT)
   }
   
   // Fallback: if running from admin directory, go up one level
