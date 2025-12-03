@@ -1,4 +1,6 @@
 #!/usr/bin/env node
 
-// VitePress Plus CLI
+import { createCLI } from '../dist/index.js'
 
+const program = createCLI()
+program.parse(process.argv)
