@@ -11,29 +11,26 @@ import articleRoutes from './routes/articleRoutes'
 import { fileWatcher } from './services/watcher'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { getProjectRoot } from './config/paths.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-
-// Load environment variables from .env file
-const envPath = path.resolve(__dirname, '../.env')
-dotenv.config({ path: envPath })
 
 // Debug: log environment variables (remove in production)
 console.log('Environment variables loaded:')
 console.log('LOCAL_STORAGE_PATH:', process.env.LOCAL_STORAGE_PATH)
 console.log('QINIU_BUCKET:', process.env.QINIU_BUCKET ? '***' : 'not set')
 
+// Load environment variables from target project root
+const projectRoot = getProjectRoot()
+const envPath = path.resolve(projectRoot, '.env')
+dotenv.config({ path: envPath })
+
 const app = express()
-// Support PROJECT_ROOT from environment or detect from current directory
-const currentDir = process.cwd()
-const projectRoot = process.env.PROJECT_ROOT 
-  || (currentDir.endsWith('admin') || currentDir.endsWith('vitepress-admin') 
-    ? path.resolve(currentDir, '..') 
-    : currentDir)
 const PORT = process.env.PORT || 3000
 
 console.log('Project root:', projectRoot)
+console.log('Environment file:', envPath)
 
 // 请求日志中间件
 app.use((req, res, next) => {
