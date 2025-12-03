@@ -1,27 +1,32 @@
 // Shared topic types for VitePress Plus projects
+// Compatible with both old and new data formats
 
 export interface Article {
+  id?: string
   slug: string
   title: string
-  status: 'completed' | 'in-progress' | 'planned'
+  summary?: string
+  status: 'completed' | 'in-progress' | 'planned' | 'draft'
   description?: string
-  id?: string
+  chapterTitle?: string
+  topicId?: string
 }
 
 export interface Chapter {
+  id?: string
   title: string
   description?: string
   articles: Article[]
-  id?: string
 }
 
 export interface Topic {
+  id?: string
   slug: string
   name: string
   description: string
   image?: string
+  categoryId?: string
   chapters: Chapter[]
-  id?: string
 }
 
 export interface TopicsData {
@@ -29,11 +34,15 @@ export interface TopicsData {
 }
 
 export interface TopicCategory {
+  id?: string
   title: string
+  slug?: string
   items: Array<{
+    id?: string
+    categoryId?: string
     slug: string
     name: string
-    description: string
+    description?: string
     image?: string
   }>
 }

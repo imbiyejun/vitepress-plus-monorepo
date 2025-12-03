@@ -29,11 +29,11 @@ export function startCommand(): Command {
       console.log(`🌐 Server port: ${port}`)
       console.log('-------------------\n')
 
-      // Server and client paths
+      // Server path (Vite is integrated as Express middleware)
       const packageRoot = path.resolve(__dirname, '../..')
       const serverPath = path.join(packageRoot, 'server/index.ts')
       
-      // Start backend server
+      // Start server with integrated Vite
       const serverProcess = spawn(
         'npx',
         ['tsx', serverPath],
@@ -50,22 +50,10 @@ export function startCommand(): Command {
         }
       )
 
-      // Start Vite dev server
-      const clientProcess = spawn(
-        'npx',
-        ['vite', '--port', '5173'],
-        {
-          stdio: 'inherit',
-          shell: true,
-          cwd: packageRoot
-        }
-      )
-
       // Handle process termination
       const cleanup = () => {
         console.log('\n\n👋 Shutting down VitePress Admin...')
         serverProcess.kill()
-        clientProcess.kill()
         process.exit(0)
       }
 
@@ -76,7 +64,7 @@ export function startCommand(): Command {
       if (shouldOpen) {
         setTimeout(async () => {
           try {
-            await open(`http://localhost:5173`)
+            await open(`http://localhost:${port}`)
             console.log('🌐 Browser opened automatically')
           } catch (error) {
             console.error('Failed to open browser:', error)
@@ -87,11 +75,6 @@ export function startCommand(): Command {
       // Handle server errors
       serverProcess.on('error', (error) => {
         console.error('❌ Server error:', error)
-        cleanup()
-      })
-
-      clientProcess.on('error', (error) => {
-        console.error('❌ Client error:', error)
         cleanup()
       })
     })

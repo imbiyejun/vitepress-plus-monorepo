@@ -28,7 +28,9 @@ const app = express()
 // Support PROJECT_ROOT from environment or detect from current directory
 const currentDir = process.cwd()
 const projectRoot = process.env.PROJECT_ROOT 
-  || (currentDir.endsWith('admin') ? path.resolve(currentDir, '..') : currentDir)
+  || (currentDir.endsWith('admin') || currentDir.endsWith('vitepress-admin') 
+    ? path.resolve(currentDir, '..') 
+    : currentDir)
 const PORT = process.env.PORT || 3000
 
 console.log('Project root:', projectRoot)
