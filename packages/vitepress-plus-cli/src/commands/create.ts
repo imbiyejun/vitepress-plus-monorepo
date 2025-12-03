@@ -72,7 +72,7 @@ export function createCommand(): Command {
 
 // Copy directory recursively, excluding node_modules and .git
 function copyDirectory(src: string, dest: string): void {
-  const excludeDirs = ['node_modules', '.git', 'dist', '.vitepress/cache', '.vitepress/dist']
+  const excludeDirs = ['node_modules', '.git', 'dist']
 
   if (!existsSync(dest)) {
     mkdirSync(dest, { recursive: true })
@@ -84,9 +84,21 @@ function copyDirectory(src: string, dest: string): void {
     const srcPath = join(src, entry.name)
     const destPath = join(dest, entry.name)
 
-    // Skip excluded directories
+    // Get relative path from template root
     const relativePath = srcPath.replace(src, '').replace(/^[\\\/]/, '')
+    
+    // Skip excluded directories
     if (excludeDirs.some(excluded => relativePath.startsWith(excluded))) {
+      continue
+    }
+
+    // Skip .vitepress/cache directory and its contents
+    if (relativePath.includes('.vitepress\\cache') || relativePath.includes('.vitepress/cache')) {
+      continue
+    }
+
+    // Skip .vitepress/dist directory
+    if (relativePath.includes('.vitepress\\dist') || relativePath.includes('.vitepress/dist')) {
       continue
     }
 

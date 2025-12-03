@@ -4,3 +4,6 @@ dist
 .idea
 .git
 docs/.vitepress/cache/
+
+# Test projects
+test-*
