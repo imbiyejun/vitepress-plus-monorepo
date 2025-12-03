@@ -1,15 +1,10 @@
 import path from 'path'
 import qiniu from 'qiniu'
+import { getProjectRoot as getRoot, getPublicPath } from '../config/paths.js'
 
-// Get project root directory
-export const getProjectRoot = () => {
-  // If running in admin directory, go back to parent
-  const currentDir = process.cwd()
-  if (currentDir.endsWith('admin')) {
-    return path.resolve(currentDir, '..')
-  }
-  return currentDir
-}
+// Re-export for backward compatibility
+export const getProjectRoot = getRoot
+export { getPublicPath }
 
 // Map storage region to Qiniu zone
 export const getQiniuZone = (region: string) => {

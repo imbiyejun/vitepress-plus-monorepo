@@ -1,8 +1,14 @@
 import { promises as fs } from 'fs'
 import { join } from 'path'
-import { fileURLToPath } from 'url'
 import matter from 'gray-matter'
-import { Topic } from '../../../docs/.vitepress/topics/data/types'
+import type { Topic } from '../types/topic.js'
+import {
+  getProjectRoot,
+  getTopicsPath,
+  getTopicsDataPath,
+  getTopicsConfigPath,
+  getVitePressPath
+} from '../config/paths.js'
 
 // 日志工具函数
 const log = {
@@ -18,19 +24,15 @@ const log = {
   }
 }
 
-// 获取项目根目录
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = join(__filename, '..', '..')
-const PROJECT_ROOT = join(__dirname, '..', '..')
-
-const DOCS_DIR = join(PROJECT_ROOT, 'docs')
-const TOPICS_DIR = join(DOCS_DIR, 'topics')
-const TOPICS_DATA_DIR = join(DOCS_DIR, '.vitepress/topics/data')
+// Path getters - no more hardcoded paths
+const getTopicsDir = () => getTopicsPath()
+const getTopicsDataDir = () => getTopicsDataPath()
+const getTopicsConfigDir = () => getTopicsConfigPath()
 
 // 更新专题的Markdown文件
 
 async function _updateTopicMarkdown(topic: Topic) {
-  const filePath = join(TOPICS_DIR, `${topic.slug}.md`)
+  const filePath = join(getTopicsDir(), `${topic.slug}.md`)
 
   // 构建frontmatter数据
   const frontmatter = {
@@ -66,7 +68,7 @@ async function _updateTopicMarkdown(topic: Topic) {
 // 更新专题的配置数据
 
 async function _updateTopicData(topic: Topic) {
-  const filePath = join(TOPICS_DATA_DIR, topic.slug, 'index.ts')
+  const filePath = join(getTopicsDataDir(), topic.slug, 'index.ts')
 
   // 构建数据内容
   const content = `import { Topic } from '../types'
@@ -75,7 +77,7 @@ export const ${topic.slug}Topic: Topic = ${JSON.stringify(topic, null, 2)}
 `
 
   // 确保目录存在
-  await fs.mkdir(join(TOPICS_DATA_DIR, topic.slug), { recursive: true })
+  await fs.mkdir(join(getTopicsDataDir(), topic.slug), { recursive: true })
 
   // 写入文件
   await fs.writeFile(filePath, content, 'utf-8')
@@ -86,7 +88,7 @@ export const ${topic.slug}Topic: Topic = ${JSON.stringify(topic, null, 2)}
 
 // 更新主数据文件
 async function updateMainDataFile(topic: Topic) {
-  const mainDataPath = join(TOPICS_DATA_DIR, 'index.ts')
+  const mainDataPath = join(getTopicsDataDir(), 'index.ts')
 
   try {
     // 读取现有文件内容
@@ -124,7 +126,7 @@ async function updateMainDataFile(topic: Topic) {
 
 // 删除主数据文件中的专题引用
 async function removeFromMainDataFile(slug: string) {
-  const mainDataPath = join(TOPICS_DATA_DIR, 'index.ts')
+  const mainDataPath = join(getTopicsDataDir(), 'index.ts')
 
   try {
     // 读取现有文件内容
@@ -176,7 +178,7 @@ async function removeFromMainDataFile(slug: string) {
 
 // 从topics配置文件中删除专题
 async function removeFromTopicsConfig(slug: string) {
-  const configPath = join(DOCS_DIR, '.vitepress/topics/config/index.ts')
+  const configPath = join(getTopicsConfigDir(), 'index.ts')
 
   try {
     // 读取现有文件内容
@@ -269,11 +271,11 @@ const generateArticleId = (chapterIndex: number, articleIndex: number) => {
 export const deleteTopicData = async (slug: string) => {
   try {
     // 删除专题数据目录
-    const topicDataDir = join(TOPICS_DATA_DIR, slug)
+    const topicDataDir = join(getTopicsDataDir(), slug)
     await fs.rm(topicDataDir, { recursive: true, force: true })
 
     // 删除专题的Markdown文件
-    const topicFile = join(TOPICS_DIR, `${slug}.md`)
+    const topicFile = join(getTopicsDir(), `${slug}.md`)
     try {
       await fs.unlink(topicFile)
     } catch (unlinkError: unknown) {
@@ -327,16 +329,8 @@ export const syncTopicData = async (topicData: Topic) => {
       .replace(/'([^']+)':/g, '$1:') // 然后移除键名的引号
 
     // 保存到配置文件
-    const configPath = join(
-      PROJECT_ROOT,
-      'docs',
-      '.vitepress',
-      'topics',
-      'data',
-      `${topicData.slug}`,
-      'index.ts'
-    )
-    const dirPath = join(PROJECT_ROOT, 'docs', '.vitepress', 'topics', 'data', topicData.slug)
+    const configPath = join(getTopicsDataDir(), `${topicData.slug}`, 'index.ts')
+    const dirPath = join(getTopicsDataDir(), topicData.slug)
 
     log.info('开始创建目录:', dirPath)
     try {

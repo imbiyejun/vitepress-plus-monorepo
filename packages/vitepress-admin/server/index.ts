@@ -25,10 +25,13 @@ console.log('LOCAL_STORAGE_PATH:', process.env.LOCAL_STORAGE_PATH)
 console.log('QINIU_BUCKET:', process.env.QINIU_BUCKET ? '***' : 'not set')
 
 const app = express()
-// 如果在 admin 目录下运行，需要回到上一级
+// Support PROJECT_ROOT from environment or detect from current directory
 const currentDir = process.cwd()
-const projectRoot = currentDir.endsWith('admin') ? path.resolve(currentDir, '..') : currentDir
+const projectRoot = process.env.PROJECT_ROOT 
+  || (currentDir.endsWith('admin') ? path.resolve(currentDir, '..') : currentDir)
 const PORT = process.env.PORT || 3000
+
+console.log('Project root:', projectRoot)
 
 // 请求日志中间件
 app.use((req, res, next) => {
@@ -53,8 +56,11 @@ app.use(express.json())
 
 // 静态文件服务
 // Serve entire public directory for directory browsing
+const publicPath = path.join(projectRoot, 'public')
+console.log('Serving static files from:', publicPath)
+
 app.use(
-  express.static(path.join(projectRoot, 'docs/public'), {
+  express.static(publicPath, {
     // 设置正确的 MIME 类型
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.png')) {

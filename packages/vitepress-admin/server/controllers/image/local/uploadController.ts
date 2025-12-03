@@ -4,14 +4,14 @@ import { Request, Response } from 'express'
 import multer from 'multer'
 import busboy from 'busboy'
 import { sendSuccess, sendError } from '../../../utils/response'
-import { getProjectRoot } from '../../../utils/imageUtils'
+import { getProjectRoot, getPublicPath } from '../../../utils/imageUtils.js'
 import type { UploadRequest } from '../../../types/image'
 
 // Create dynamic multer storage based on request
 export const createStorage = (uploadPath: string = '') => {
   return multer.diskStorage({
     destination: async (req, file, cb) => {
-      const projectRoot = getProjectRoot()
+      const publicPath = getPublicPath()
       let customPath = uploadPath
 
       // Prevent directory traversal attacks
@@ -19,7 +19,7 @@ export const createStorage = (uploadPath: string = '') => {
         customPath = ''
       }
 
-      const uploadDir = path.join(projectRoot, 'docs/public', customPath)
+      const uploadDir = path.join(publicPath, customPath)
 
       // Ensure directory exists
       try {
@@ -91,7 +91,7 @@ export const uploadImages = async (req: UploadRequest, res: Response) => {
 
     const uploadedFiles = files.map(file => {
       const relativePath = path
-        .relative(path.join(getProjectRoot(), 'docs/public'), file.path)
+        .relative(getPublicPath(), file.path)
         .replace(/\\/g, '/')
 
       return {
@@ -157,8 +157,8 @@ export const uploadImagesWithPath = async (req: Request, res: Response) => {
           uploadPath = ''
         }
 
-        const projectRoot = getProjectRoot()
-        const uploadDir = path.join(projectRoot, 'docs/public', uploadPath)
+        const publicPath = getPublicPath()
+        const uploadDir = path.join(publicPath, uploadPath)
 
         // Ensure directory exists
         try {
@@ -197,7 +197,7 @@ export const uploadImagesWithPath = async (req: Request, res: Response) => {
           await fs.writeFile(filePath, fileData.buffer)
 
           const relativePath = path
-            .relative(path.join(projectRoot, 'docs/public'), filePath)
+            .relative(getPublicPath(), filePath)
             .replace(/\\/g, '/')
 
           uploadedFiles.push({

@@ -2,7 +2,7 @@ import path from 'path'
 import fs from 'fs/promises'
 import { Request, Response } from 'express'
 import { sendSuccess, sendError } from '../../../utils/response'
-import { getProjectRoot } from '../../../utils/imageUtils'
+import { getProjectRoot, getPublicPath } from '../../../utils/imageUtils.js'
 
 // Type definitions
 interface ImageFile {
@@ -24,12 +24,12 @@ const getRelativePath = (imagePath: string): string => {
   }
 }
 
-// Get all images from docs/public directory
+// Get all images from public directory
 export const getAllImages = async (req: Request, res: Response) => {
   try {
     const { search } = req.query
-    const projectRoot = getProjectRoot()
-    const publicImagesPath = path.join(projectRoot, 'docs/public/images')
+    const publicPath = getPublicPath()
+    const publicImagesPath = path.join(publicPath, 'images')
 
     // Recursively get all image files
     async function getImagesRecursively(dir: string): Promise<ImageFile[]> {
@@ -95,10 +95,10 @@ export const deleteImage = async (req: Request, res: Response) => {
       return sendError(res, '缺少图片路径参数', 400)
     }
 
-    const projectRoot = getProjectRoot()
+    const publicPath = getPublicPath()
     const relativePath = getRelativePath(imagePath)
-    // All files are under docs/public/
-    const fullPath = path.join(projectRoot, 'docs/public', relativePath)
+    // All files are under public/
+    const fullPath = path.join(publicPath, relativePath)
 
     // Check if file exists
     try {
@@ -125,10 +125,10 @@ export const renameImage = async (req: Request, res: Response) => {
       return sendError(res, '缺少必要参数', 400)
     }
 
-    const projectRoot = getProjectRoot()
+    const publicPath = getPublicPath()
     const relativePath = getRelativePath(imagePath)
-    // All files are under docs/public/
-    const fullPath = path.join(projectRoot, 'docs/public', relativePath)
+    // All files are under public/
+    const fullPath = path.join(publicPath, relativePath)
     const dirPath = path.dirname(fullPath)
 
     // Check if file exists
@@ -156,7 +156,7 @@ export const renameImage = async (req: Request, res: Response) => {
     // Get new file info
     const stats = await fs.stat(newFullPath)
     const newRelativePath = path
-      .relative(path.join(projectRoot, 'docs/public'), newFullPath)
+      .relative(getPublicPath(), newFullPath)
       .replace(/\\/g, '/')
 
     sendSuccess(res, {
@@ -179,10 +179,10 @@ export const checkImageName = async (req: Request, res: Response) => {
       return sendError(res, '缺少必要参数', 400)
     }
 
-    const projectRoot = getProjectRoot()
+    const publicPath = getPublicPath()
     const relativePath = getRelativePath(imagePath)
-    // All files are under docs/public/
-    const fullPath = path.join(projectRoot, 'docs/public', relativePath)
+    // All files are under public/
+    const fullPath = path.join(publicPath, relativePath)
     const dirPath = path.dirname(fullPath)
     const ext = path.extname(fullPath)
     const newFullPath = path.join(dirPath, newName + ext)

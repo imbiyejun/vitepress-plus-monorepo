@@ -1,8 +1,8 @@
 import { Request, Response } from 'express'
 import { promises as fs } from 'fs'
 import { join } from 'path'
-import { fileURLToPath } from 'url'
-import { sendSuccess, sendError } from '../utils/response'
+import { sendSuccess, sendError } from '../utils/response.js'
+import { getTopicsConfigPath, getTopicsDataPath } from '../config/paths.js'
 
 // Type definitions
 interface TopicCategory {
@@ -41,17 +41,14 @@ interface FormatObject {
 }
 type FormatArray = FormatValue[]
 
-// 获取项目根目录
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = join(__filename, '..', '..')
-const PROJECT_ROOT = join(__dirname, '..', '..')
-const TOPICS_CONFIG_FILE = join(PROJECT_ROOT, 'docs', '.vitepress', 'topics', 'config', 'index.ts')
-const TOPICS_DATA_DIR = join(PROJECT_ROOT, 'docs', '.vitepress', 'topics', 'data')
+// Path getters
+const getTopicsConfigFile = () => join(getTopicsConfigPath(), 'index.ts')
+const getTopicsDataDir = () => getTopicsDataPath()
 
 // 从文件中读取topics配置
 const readTopicsConfig = async (): Promise<TopicCategory[]> => {
   try {
-    const content = await fs.readFile(TOPICS_CONFIG_FILE, 'utf-8')
+    const content = await fs.readFile(getTopicsConfigFile(), 'utf-8')
 
     // 使用正则表达式提取topics数组的内容
     const match = content.match(/export const topics[^=]+=\s*(\[[\s\S]*?\n])/m)
@@ -76,7 +73,7 @@ const readTopicsConfig = async (): Promise<TopicCategory[]> => {
 // 动态读取专题数据以获取文章数量
 const loadTopicData = async (slug: string): Promise<TopicData | null> => {
   try {
-    const filePath = join(TOPICS_DATA_DIR, slug, 'index.ts')
+    const filePath = join(getTopicsDataDir(), slug, 'index.ts')
     const fileContent = await fs.readFile(filePath, 'utf-8')
 
     // 使用正则表达式提取 Topic 对象
@@ -170,7 +167,7 @@ export const addCategory = async (req: Request, res: Response) => {
     }
 
     // 读取当前配置文件内容
-    const fileContent = await fs.readFile(TOPICS_CONFIG_FILE, 'utf-8')
+    const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
 
     // 构建新的分类对象
     const newCategory = `  {
@@ -184,7 +181,7 @@ export const addCategory = async (req: Request, res: Response) => {
     const updatedContent = fileContent.replace(/(\n])/, `,\n${newCategory}\n]`)
 
     // 写入文件
-    await fs.writeFile(TOPICS_CONFIG_FILE, updatedContent, 'utf-8')
+    await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     // 返回与getCategories一致的数据结构
     sendSuccess(
@@ -284,12 +281,12 @@ export * from './types'
 `
 
     // 写入配置文件
-    await fs.writeFile(TOPICS_CONFIG_FILE, updatedContent, 'utf-8')
+    await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     // 更新专题数据文件中的categoryId
     await Promise.all(
       categoryToUpdate.items.map(async topic => {
-        const topicDataFile = join(TOPICS_DATA_DIR, topic.slug, 'index.ts')
+        const topicDataFile = join(getTopicsDataDir(), topic.slug, 'index.ts')
         try {
           const content = await fs.readFile(topicDataFile, 'utf-8')
           const updatedContent = content.replace(
@@ -335,7 +332,7 @@ export const deleteCategory = async (req: Request, res: Response) => {
     }
 
     // 读取当前配置文件内容
-    await fs.readFile(TOPICS_CONFIG_FILE, 'utf-8')
+    await fs.readFile(getTopicsConfigFile(), 'utf-8')
     const topics = await readTopicsConfig()
 
     // 查找要删除的分类
@@ -387,7 +384,7 @@ export * from './types'
 `
 
     // 写入文件
-    await fs.writeFile(TOPICS_CONFIG_FILE, updatedContent, 'utf-8')
+    await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     sendSuccess(res, null, '删除成功')
   } catch (error) {
@@ -404,7 +401,7 @@ export const updateCategoriesOrder = async (req: Request, res: Response) => {
     }
 
     // 读取当前配置文件内容
-    await fs.readFile(TOPICS_CONFIG_FILE, 'utf-8')
+    await fs.readFile(getTopicsConfigFile(), 'utf-8')
     const topics = await readTopicsConfig()
 
     // 验证所有提交的分类ID是否有效
@@ -455,7 +452,7 @@ export * from './types'
 `
 
     // 写入文件
-    await fs.writeFile(TOPICS_CONFIG_FILE, updatedContent, 'utf-8')
+    await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     sendSuccess(res, null, '更新成功')
   } catch (error) {
@@ -536,7 +533,7 @@ export * from './types'
 `
 
     // 写入配置文件
-    await fs.writeFile(TOPICS_CONFIG_FILE, updatedContent, 'utf-8')
+    await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     // 生成专题数据文件
     await generateTopicDataFile(newTopic)
@@ -566,7 +563,7 @@ export * from './types'
 // 生成专题数据文件
 const generateTopicDataFile = async (topic: TopicItem): Promise<void> => {
   try {
-    const topicDir = join(TOPICS_DATA_DIR, topic.slug)
+    const topicDir = join(getTopicsDataDir(), topic.slug)
 
     // 创建专题目录
     await fs.mkdir(topicDir, { recursive: true })
@@ -599,7 +596,7 @@ export const ${topic.slug}Topic: Topic = {
 // 更新topics数据索引文件
 const updateTopicsDataIndex = async (topicSlug: string) => {
   try {
-    const indexFile = join(TOPICS_DATA_DIR, 'index.ts')
+    const indexFile = join(getTopicsDataDir(), 'index.ts')
 
     // 读取现有的索引文件
     let indexContent = await fs.readFile(indexFile, 'utf-8')

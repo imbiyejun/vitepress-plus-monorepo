@@ -1,20 +1,15 @@
 import { Request, Response } from 'express'
-// @ts-expect-error - ES module compatibility with workspace package
-import { topicsData } from '@mind-palace/docs/data'
 import { promises as fs } from 'fs'
 import { join } from 'path'
-import { fileURLToPath } from 'url'
-import { sendSuccess, sendError } from '../utils/response'
-
-// Get project root directory
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = join(__filename, '..', '..')
-const PROJECT_ROOT = join(__dirname, '..', '..')
-const ARTICLES_DIR = join(PROJECT_ROOT, 'docs', 'articles')
+import { sendSuccess, sendError } from '../utils/response.js'
+import { loadTopicsData } from '../utils/data-loader.js'
+import { getArticlesPath } from '../config/paths.js'
 
 export const getTopicArticleList = async (req: Request, res: Response) => {
   const { topicId } = req.params
   try {
+    // Dynamically load topics data from target project
+    const topicsData = await loadTopicsData()
     const topicData = topicsData[topicId]
 
     if (!topicData) {
@@ -53,7 +48,8 @@ export const getArticleContent = async (req: Request, res: Response) => {
   const { topicSlug, articleSlug } = req.params
 
   try {
-    const articlePath = join(ARTICLES_DIR, topicSlug, `${articleSlug}.md`)
+    const articlesDir = getArticlesPath()
+    const articlePath = join(articlesDir, topicSlug, `${articleSlug}.md`)
 
     // Check if file exists, if not create default content
     let content = ''
@@ -71,7 +67,8 @@ description:
 
 `
       // Ensure directory exists
-      const topicDir = join(ARTICLES_DIR, topicSlug)
+      const articlesDir = getArticlesPath()
+      const topicDir = join(articlesDir, topicSlug)
       try {
         await fs.access(topicDir)
       } catch {
@@ -103,10 +100,11 @@ export const updateArticleContent = async (req: Request, res: Response) => {
   }
 
   try {
-    const articlePath = join(ARTICLES_DIR, topicSlug, `${articleSlug}.md`)
+    const articlesDir = getArticlesPath()
+    const articlePath = join(articlesDir, topicSlug, `${articleSlug}.md`)
 
     // Ensure directory exists
-    const topicDir = join(ARTICLES_DIR, topicSlug)
+    const topicDir = join(articlesDir, topicSlug)
     try {
       await fs.access(topicDir)
     } catch {

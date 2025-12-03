@@ -17,44 +17,56 @@
     "LICENSE"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "vite",
-    "dev:server": "nodemon --watch server -e ts --exec tsx server/index.ts",
-    "build": "npm run build:client && npm run build:server",
-    "build:client": "vite build",
-    "build:server": "tsc -p tsconfig.server.json"
-  },
-  "peerDependencies": {
-    "@imbiyejun/vitepress-plus": "workspace:*"
+    "dev": "cross-env NODE_ENV=development nodemon --watch server -e ts --exec \"tsx server/index.ts\""
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
+    "@types/busboy": "^1.5.4",
+    "@types/lodash-es": "^4.17.12",
+    "@types/multer": "^2.0.0",
+    "@vueuse/core": "^10.7.0",
     "ant-design-vue": "^4.0.0",
+    "axios": "^1.11.0",
+    "busboy": "^1.6.0",
     "chokidar": "^4.0.3",
-    "commander": "^11.0.0",
-    "cosmiconfig": "^9.0.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.18.0",
     "gray-matter": "^4.0.3",
     "lodash-es": "^4.17.21",
-    "open": "^11.0.0",
+    "md-editor-v3": "^6.1.1",
+    "mitt": "^3.0.1",
+    "multer": "^2.0.2",
+    "qiniu": "^7.14.0",
     "vue": "^3.4.0",
-    "vue-router": "^4.5.0",
+    "vue-advanced-cropper": "^2.8.9",
+    "vue-router": "4",
+    "vuedraggable": "^4.1.0",
     "ws": "^8.16.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
-    "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.0.0",
     "@types/ws": "^8.5.10",
-    "@vitejs/plugin-vue": "^5.2.1",
-    "@vue/tsconfig": "^0.7.0",
+    "@vitejs/plugin-vue": "^5.0.0",
     "concurrently": "^9.2.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-vue": "^10.5.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
     "nodemon": "^3.1.0",
+    "prettier": "^3.2.5",
     "tsx": "^4.20.3",
     "typescript": "^5.0.0",
+    "typescript-eslint": "^8.47.0",
     "vite": "^5.0.0",
-    "vue-tsc": "^2.1.10"
+    "vitepress": "^1.6.3",
+    "vue-eslint-parser": "^10.2.0",
+    "vue-tsc": "^3.1.4"
   }
 }
-

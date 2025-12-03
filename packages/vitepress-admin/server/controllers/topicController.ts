@@ -1,22 +1,16 @@
 import { Request, Response } from 'express'
 import { promises as fs } from 'fs'
 import { join } from 'path'
-import { fileURLToPath } from 'url'
-import { acquireLock, releaseLock } from '../utils/file-lock'
-import { backupFile, restoreFile } from '../utils/backup'
+import { acquireLock, releaseLock } from '../utils/file-lock.js'
+import { backupFile, restoreFile } from '../utils/backup.js'
 import matter from 'gray-matter'
-import { syncTopicData, deleteTopicData } from '../services/topic-sync'
-import { sendSuccess, sendError } from '../utils/response'
-
-// 获取项目根目录
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = join(__filename, '..', '..')
-const PROJECT_ROOT = join(__dirname, '..', '..')
-
-const TOPICS_DIR = join(PROJECT_ROOT, 'docs', 'topics')
-const TOPICS_DATA_DIR = join(PROJECT_ROOT, 'docs', '.vitepress', 'topics', 'data')
-const DOCS_DIR = join(PROJECT_ROOT, 'docs')
-const ARTICLES_DIR = join(DOCS_DIR, 'articles')
+import { syncTopicData, deleteTopicData } from '../services/topic-sync.js'
+import { sendSuccess, sendError } from '../utils/response.js'
+import {
+  getTopicsPath,
+  getTopicsDataPath,
+  getArticlesPath
+} from '../config/paths.js'
 
 interface TopicMetadata {
   title: string
@@ -37,7 +31,7 @@ const _parseTopicContent = (content: string): TopicMetadata => {
 export const readTopicConfig = async (req: Request, res: Response) => {
   try {
     const { filename } = req.params
-    const filePath = join(TOPICS_DIR, filename)
+    const filePath = join(getTopicsPath(), filename)
     console.log('Reading file from:', filePath)
     const content = await fs.readFile(filePath, 'utf-8')
     sendSuccess(res, { content })
@@ -50,7 +44,7 @@ export const readTopicConfig = async (req: Request, res: Response) => {
 export const updateTopicConfig = async (req: Request, res: Response) => {
   const { filename } = req.params
   const { content } = req.body
-  const filePath = join(TOPICS_DIR, filename)
+  const filePath = join(getTopicsPath(), filename)
 
   try {
     await acquireLock(filePath)
@@ -68,7 +62,7 @@ export const updateTopicConfig = async (req: Request, res: Response) => {
 // 动态读取专题数据
 const loadTopicData = async (slug: string) => {
   try {
-    const filePath = join(TOPICS_DATA_DIR, slug, 'index.ts')
+    const filePath = join(getTopicsDataPath(), slug, 'index.ts')
     const fileContent = await fs.readFile(filePath, 'utf-8')
 
     // 使用正则表达式提取 Topic 对象
@@ -103,7 +97,7 @@ interface TopicListItem {
 export const listTopics = async (req: Request, res: Response) => {
   try {
     // 读取专题数据目录下的所有文件夹
-    const topics = await fs.readdir(TOPICS_DATA_DIR, { withFileTypes: true })
+    const topics = await fs.readdir(getTopicsDataPath(), { withFileTypes: true })
     const topicData: TopicListItem[] = []
 
     interface Chapter {
@@ -139,7 +133,7 @@ export const listTopics = async (req: Request, res: Response) => {
 
 export const restoreTopicConfig = async (req: Request, res: Response) => {
   const { filename } = req.params
-  const filePath = join(TOPICS_DIR, filename)
+  const filePath = join(getTopicsPath(), filename)
 
   try {
     await restoreFile(filePath)
@@ -206,7 +200,7 @@ interface TopicData {
 
 // 同步文件系统
 const syncFileSystem = async (topicData: TopicData) => {
-  const topicDir = join(ARTICLES_DIR, topicData.slug)
+  const topicDir = join(getArticlesPath(), topicData.slug)
   await ensureDir(topicDir)
 
   // 创建新文章文件
@@ -242,7 +236,7 @@ export const updateTopicDetail = async (req: Request, res: Response) => {
       await syncTopicData(topicData)
 
       // 2. 更新大类配置文件
-      const configPath = join(DOCS_DIR, '.vitepress/topics/config/index.ts')
+      const configPath = join(getTopicsConfigPath(), 'index.ts')
       const configContent = await fs.readFile(configPath, 'utf-8')
 
       // 使用正则表达式提取topics数组的内容
@@ -457,7 +451,7 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
     }
 
     // 读取所有专题数据
-    const topics = await fs.readdir(TOPICS_DATA_DIR, { withFileTypes: true })
+    const topics = await fs.readdir(getTopicsDataPath(), { withFileTypes: true })
     const topicDataMap = new Map()
 
     // 加载所有专题数据
@@ -491,7 +485,7 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
     }
 
     // 更新 topics/config/index.ts 文件
-    const configPath = join(DOCS_DIR, '.vitepress/topics/config/index.ts')
+    const configPath = join(getTopicsConfigPath(), 'index.ts')
     const configContent = await fs.readFile(configPath, 'utf-8')
 
     // 使用正则表达式提取topics数组的内容

@@ -1,5 +1,5 @@
 {
-  "name": "@mind-palace/docs",
+  "name": "@imbiyejun/vitepress-plus",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,8 +12,12 @@
   },
   "scripts": {
     "dev": "vitepress dev .",
+    "dev:admin": "vpa start -r .",
     "build": "vitepress build .",
     "preview": "vitepress preview ."
+  },
+  "dependencies": {
+    "@imbiyejun/vitepress-admin": "workspace:*"
   },
   "devDependencies": {
     "prettier": "^3.2.5",

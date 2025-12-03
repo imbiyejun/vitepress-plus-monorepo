@@ -2,15 +2,14 @@ import path from 'path'
 import fs from 'fs/promises'
 import { Request, Response } from 'express'
 import { sendSuccess, sendError } from '../../../utils/response'
-import { getProjectRoot } from '../../../utils/imageUtils'
+import { getPublicPath } from '../../../utils/imageUtils.js'
 import type { DirectoryItem, Breadcrumb } from '../../../types/image'
 
 // Get directory contents with files and folders, with search support
 export const getDirectoryContents = async (req: Request, res: Response) => {
   try {
     const { dirPath = '', search = '' } = req.query
-    const projectRoot = getProjectRoot()
-    const publicPath = path.join(projectRoot, 'docs/public')
+    const publicPath = getPublicPath()
 
     // Sanitize directory path to prevent directory traversal
     let safeDirPath = ''
@@ -170,8 +169,7 @@ export const createDirectory = async (req: Request, res: Response) => {
       return sendError(res, '无效的目录名称', 400)
     }
 
-    const projectRoot = getProjectRoot()
-    const publicPath = path.join(projectRoot, 'docs/public')
+    const publicPath = getPublicPath()
 
     // Sanitize parent directory path
     let safeDirPath = ''
@@ -212,8 +210,7 @@ export const deleteDirectory = async (req: Request, res: Response) => {
       return sendError(res, '缺少目录路径参数', 400)
     }
 
-    const projectRoot = getProjectRoot()
-    const publicPath = path.join(projectRoot, 'docs/public')
+    const publicPath = getPublicPath()
 
     // Sanitize directory path
     const safeDirPath = path.normalize(directoryPath).replace(/^(\.\.[/\\])+/, '')
@@ -253,8 +250,7 @@ export const deleteDirectory = async (req: Request, res: Response) => {
 export const getLocalDirectories = async (req: Request, res: Response) => {
   try {
     const { prefix = '' } = req.query
-    const projectRoot = getProjectRoot()
-    const publicPath = path.join(projectRoot, 'docs/public')
+    const publicPath = getPublicPath()
 
     // Sanitize prefix
     let safePrefix = ''
