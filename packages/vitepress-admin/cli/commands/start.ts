@@ -30,7 +30,8 @@ export function startCommand(): Command {
       console.log('-------------------\n')
 
       // Server path (Vite is integrated as Express middleware)
-      const packageRoot = path.resolve(__dirname, '../..')
+      // When compiled, this file is in dist/cli/commands, need to go up to package root
+      const packageRoot = path.resolve(__dirname, '../../..')
       const serverPath = path.join(packageRoot, 'server/index.ts')
       
       // Start server with integrated Vite

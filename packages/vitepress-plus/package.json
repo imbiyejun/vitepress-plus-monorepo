@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "vitepress dev .",
-    "dev:admin": "vpa start -r .",
+    "admin": "vpa start -r .",
     "build": "vitepress build .",
     "preview": "vitepress preview ."
   },
