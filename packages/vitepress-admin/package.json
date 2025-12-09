@@ -20,7 +20,11 @@
     "dev": "cross-env NODE_ENV=development nodemon --watch server -e ts --exec \"tsx server/index.ts\"",
     "build": "npm run build:client && npm run build:cli",
     "build:client": "vite build",
-    "build:cli": "tsc -p tsconfig.cli.json"
+    "build:cli": "tsc -p tsconfig.cli.json",
+    "type-check": "vue-tsc --noEmit && tsc --project tsconfig.server.json --noEmit && tsc --project tsconfig.cli.json --noEmit",
+    "type-check:client": "vue-tsc --noEmit",
+    "type-check:server": "tsc --project tsconfig.server.json --noEmit",
+    "type-check:cli": "tsc --project tsconfig.cli.json --noEmit"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",

@@ -23,7 +23,7 @@ const getTopicsDir = () => getTopicsPath()
 const getTopicsDataDir = () => getTopicsDataPath()
 const getTopicsConfigDir = () => getTopicsConfigPath()
 
-// 更新专题的Markdown文件
+// 更新专题的Markdown文件 (reserved for future use)
 
 async function _updateTopicMarkdown(topic: Topic) {
   const filePath = join(getTopicsDir(), `${topic.slug}.md`)
@@ -59,7 +59,7 @@ async function _updateTopicMarkdown(topic: Topic) {
   await fs.writeFile(filePath, markdown, 'utf-8')
 }
 
-// 更新专题的配置数据
+// 更新专题的配置数据 (reserved for future use)
 
 async function _updateTopicData(topic: Topic) {
   const filePath = join(getTopicsDataDir(), topic.slug, 'index.ts')
@@ -138,7 +138,7 @@ async function removeFromMainDataFile(slug: string) {
     // 修复格式化问题
     content = content
       // 确保所有import语句使用正确的格式
-      .replace(/import\s*{([^}]+)}\s*from/g, (match, imports) => {
+      .replace(/import\s*{([^}]+)}\s*from/g, (_match, imports) => {
         return `import { ${imports.trim()} } from`
       })
       // 修复多余的空行
@@ -148,7 +148,7 @@ async function removeFromMainDataFile(slug: string) {
       // 修复topicsData对象的格式
       .replace(
         /(export const topicsData: TopicsData =\s*{)([\s\S]*?)(}+)(\s*\n+\s*export)/,
-        (match, start, objContent, closeBraces, end) => {
+        (_match, start, objContent, _closeBraces, end) => {
           // 提取所有有效的属性
           const props = objContent
             .split(',')

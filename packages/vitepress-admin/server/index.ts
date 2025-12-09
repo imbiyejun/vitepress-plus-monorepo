@@ -26,7 +26,7 @@ const projectRoot = getProjectRoot()
 const envPath = path.resolve(projectRoot, '.env')
 dotenv.config({ path: envPath })
 
-const app = express()
+const app: express.Application = express()
 const PORT = process.env.PORT || 3000
 
 console.log('Project root:', projectRoot)
@@ -99,7 +99,7 @@ async function setupVite() {
 }
 
 // 错误处理中间件
-app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const now = new Date().toLocaleString()
   console.error(`[${now}] Error:`, err.stack)
   console.log('-------------------')

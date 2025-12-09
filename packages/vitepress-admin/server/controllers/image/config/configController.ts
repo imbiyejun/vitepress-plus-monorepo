@@ -3,7 +3,7 @@ import { sendSuccess, sendError } from '../../../utils/response'
 import { loadImageConfigFromEnv } from '../../../config/imageConfig'
 
 // Get image configuration from environment variables
-export const getImageConfig = async (req: Request, res: Response) => {
+export const getImageConfig = async (_req: Request, res: Response) => {
   try {
     const config = loadImageConfigFromEnv()
     sendSuccess(res, config)

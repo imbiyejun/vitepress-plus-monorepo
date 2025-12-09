@@ -10,7 +10,7 @@ import type { UploadRequest } from '../../../types/image'
 // Create dynamic multer storage based on request
 export const createStorage = (uploadPath: string = '') => {
   return multer.diskStorage({
-    destination: async (req, file, cb) => {
+    destination: async (_req, _file, cb) => {
       const publicPath = getPublicPath()
       let customPath = uploadPath
 
@@ -30,7 +30,7 @@ export const createStorage = (uploadPath: string = '') => {
 
       cb(null, uploadDir)
     },
-    filename: (req, file, cb) => {
+    filename: (_req, file, cb) => {
       // Get original filename (without extension) and extension
       const ext = path.extname(file.originalname)
       const nameWithoutExt = path.basename(file.originalname, ext)

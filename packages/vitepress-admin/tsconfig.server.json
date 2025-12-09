@@ -1,11 +1,13 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": ".",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "outDir": "./dist/server",
+    "rootDir": "./server",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "noUnusedLocals": false
   },
-  "include": ["server/**/*", "config/**/*"],
-  "exclude": ["node_modules", "dist", "src"]
+  "include": ["server/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

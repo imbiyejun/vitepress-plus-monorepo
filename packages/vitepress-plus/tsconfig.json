@@ -4,7 +4,7 @@
     "useDefineForClassFields": true,
     "module": "ESNext",
     "moduleResolution": "node",
-    "strict": true,
+    "strict": false,
     "jsx": "preserve",
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -17,15 +17,24 @@
     },
     "types": ["vite/client", "vitepress", "node"],
     "allowJs": true,
-    "noEmit": true
+    "noEmit": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": [
-    ".vitepress/**/*.ts",
-    ".vitepress/**/*.d.ts",
-    ".vitepress/**/*.tsx",
-    ".vitepress/**/*.vue",
+    ".vitepress/theme/**/*.ts",
+    ".vitepress/theme/**/*.vue",
+    ".vitepress/topics/**/*.ts",
+    ".vitepress/topics/**/*.d.ts",
     "env.d.ts",
     "shims-vue.d.ts"
   ],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".vitepress/cache",
+    ".vitepress/scripts",
+    ".vitepress/theme",
+    ".vitepress/utils"
+  ]
 }

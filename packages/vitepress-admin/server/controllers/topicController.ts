@@ -19,7 +19,8 @@ interface TopicMetadata {
   layout?: string
 }
 
-// Parse topic content (unused for now)
+// Parse topic content (reserved for future use)
+
 const _parseTopicContent = (content: string): TopicMetadata => {
   const { data } = matter(content)
   return {
@@ -95,7 +96,7 @@ interface TopicListItem {
   articleCount: number
 }
 
-export const listTopics = async (req: Request, res: Response) => {
+export const listTopics = async (_req: Request, res: Response) => {
   try {
     // 读取专题数据目录下的所有文件夹
     const topics = await fs.readdir(getTopicsDataPath(), { withFileTypes: true })

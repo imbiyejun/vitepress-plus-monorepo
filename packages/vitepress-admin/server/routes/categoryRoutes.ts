@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import type { Router as ExpressRouter } from 'express'
 import {
   getCategories,
   addCategory,
@@ -8,7 +9,7 @@ import {
   addTopic
 } from '../controllers/categoryController'
 
-const router = Router()
+const router: ExpressRouter = Router()
 
 // 获取所有专题大类
 router.get('/', getCategories)

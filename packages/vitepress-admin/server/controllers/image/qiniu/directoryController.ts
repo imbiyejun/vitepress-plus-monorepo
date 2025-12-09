@@ -46,7 +46,7 @@ export const createQiniuDirectory = async (req: Request, res: Response) => {
     const putExtra = new qiniu.form_up.PutExtra()
 
     await new Promise<void>((resolve, reject) => {
-      formUploader.put(uploadToken, markerKey, Buffer.from(''), putExtra, (err, body, info) => {
+      formUploader.put(uploadToken, markerKey, Buffer.from(''), putExtra, (err, _body, info) => {
         if (err) {
           reject(err)
         } else if (info.statusCode === 200) {
@@ -110,7 +110,7 @@ export const deleteQiniuDirectory = async (req: Request, res: Response) => {
       const deleteOps = listResult.items.map(item => qiniu.rs.deleteOp(bucket, item.key))
 
       await new Promise<void>((resolve, reject) => {
-        bucketManager.batch(deleteOps, (err, respBody, respInfo) => {
+        bucketManager.batch(deleteOps, (err, _respBody, respInfo) => {
           if (err) {
             reject(err)
           } else if (respInfo.statusCode === 200) {

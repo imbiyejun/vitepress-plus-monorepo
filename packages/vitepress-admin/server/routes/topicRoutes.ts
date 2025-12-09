@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import type { Router as ExpressRouter } from 'express'
 import {
   readTopicConfig,
   updateTopicConfig,
@@ -10,7 +11,7 @@ import {
   updateTopicsOrder
 } from '../controllers/topicController'
 
-const router = Router()
+const router: ExpressRouter = Router()
 
 // 获取专题列表
 router.get('/topics', listTopics)

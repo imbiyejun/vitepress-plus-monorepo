@@ -21,7 +21,7 @@ import {
   getLocalDirectories
 } from '../controllers/image'
 
-const router = express.Router()
+const router: express.Router = express.Router()
 
 // Existing image management routes
 router.get('/list', getAllImages)

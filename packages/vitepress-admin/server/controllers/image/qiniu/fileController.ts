@@ -215,7 +215,7 @@ export const deleteQiniuImage = async (req: Request, res: Response) => {
     const bucketManager = new qiniu.rs.BucketManager(mac, bucketConfig)
 
     await new Promise<void>((resolve, reject) => {
-      bucketManager.delete(bucket, key, (err, respBody, respInfo) => {
+      bucketManager.delete(bucket, key, (err, _respBody, respInfo) => {
         if (err) {
           reject(err)
         } else if (respInfo.statusCode === 200) {
@@ -268,7 +268,7 @@ export const renameQiniuImage = async (req: Request, res: Response) => {
         bucket,
         newKey,
         { force: true },
-        (err, respBody, respInfo) => {
+        (err, _respBody, respInfo) => {
           if (err) {
             reject(err)
           } else if (respInfo.statusCode === 200) {
@@ -282,7 +282,7 @@ export const renameQiniuImage = async (req: Request, res: Response) => {
 
     // Delete old file
     await new Promise<void>((resolve, reject) => {
-      bucketManager.delete(bucket, oldKey, (err, respBody, respInfo) => {
+      bucketManager.delete(bucket, oldKey, (err, _respBody, respInfo) => {
         if (err) {
           reject(err)
         } else if (respInfo.statusCode === 200) {

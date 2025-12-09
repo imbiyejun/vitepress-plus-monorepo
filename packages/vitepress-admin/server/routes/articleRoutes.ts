@@ -1,11 +1,12 @@
 import { Router } from 'express'
+import type { Router as ExpressRouter } from 'express'
 import {
   getTopicArticleList,
   getArticleContent,
   updateArticleContent
 } from '../controllers/articleController.js'
 
-const router = Router()
+const router: ExpressRouter = Router()
 
 // Get article list for a topic
 router.get('/topics/:topicId/articles', getTopicArticleList)
