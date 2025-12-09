@@ -4,7 +4,7 @@ import { Request, Response } from 'express'
 import multer from 'multer'
 import busboy from 'busboy'
 import { sendSuccess, sendError } from '../../../utils/response'
-import { getProjectRoot, getPublicPath } from '../../../utils/imageUtils.js'
+import { getPublicPath } from '../../../utils/imageUtils.js'
 import type { UploadRequest } from '../../../types/image'
 
 // Create dynamic multer storage based on request
@@ -90,9 +90,7 @@ export const uploadImages = async (req: UploadRequest, res: Response) => {
     }
 
     const uploadedFiles = files.map(file => {
-      const relativePath = path
-        .relative(getPublicPath(), file.path)
-        .replace(/\\/g, '/')
+      const relativePath = path.relative(getPublicPath(), file.path).replace(/\\/g, '/')
 
       return {
         name: file.originalname,
@@ -196,9 +194,7 @@ export const uploadImagesWithPath = async (req: Request, res: Response) => {
           // Write file
           await fs.writeFile(filePath, fileData.buffer)
 
-          const relativePath = path
-            .relative(getPublicPath(), filePath)
-            .replace(/\\/g, '/')
+          const relativePath = path.relative(getPublicPath(), filePath).replace(/\\/g, '/')
 
           uploadedFiles.push({
             name: fileData.originalname,

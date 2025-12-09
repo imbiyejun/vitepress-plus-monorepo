@@ -46,4 +46,3 @@ export interface TopicCategory {
     image?: string
   }>
 }
-

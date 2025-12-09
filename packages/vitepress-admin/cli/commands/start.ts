@@ -23,7 +23,7 @@ export function startCommand(): Command {
     .option('-r, --root <root>', 'Project root directory', process.cwd())
     .action(async (options: StartOptions) => {
       const { port = '3000', open: shouldOpen = false, root = process.cwd() } = options
-      
+
       // Resolve to absolute path
       const absoluteRoot = path.resolve(root)
 
@@ -36,23 +36,19 @@ export function startCommand(): Command {
       // When compiled, this file is in dist/cli/commands, need to go up to package root
       const packageRoot = path.resolve(__dirname, '../../..')
       const serverPath = path.join(packageRoot, 'server/index.ts')
-      
+
       // Start server with integrated Vite
-      const serverProcess = spawn(
-        'npx',
-        ['tsx', serverPath],
-        {
-          stdio: 'inherit',
-          shell: true,
-          env: {
-            ...process.env,
-            PORT: port,
-            PROJECT_ROOT: absoluteRoot,
-            NODE_ENV: 'development'
-          },
-          cwd: packageRoot
-        }
-      )
+      const serverProcess = spawn('npx', ['tsx', serverPath], {
+        stdio: 'inherit',
+        shell: true,
+        env: {
+          ...process.env,
+          PORT: port,
+          PROJECT_ROOT: absoluteRoot,
+          NODE_ENV: 'development'
+        },
+        cwd: packageRoot
+      })
 
       // Handle process termination
       const cleanup = () => {
@@ -77,7 +73,7 @@ export function startCommand(): Command {
       }
 
       // Handle server errors
-      serverProcess.on('error', (error) => {
+      serverProcess.on('error', error => {
         console.error('❌ Server error:', error)
         cleanup()
       })
@@ -85,4 +81,3 @@ export function startCommand(): Command {
 
   return start
 }
-

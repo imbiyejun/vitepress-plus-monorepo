@@ -18,10 +18,10 @@ const { page } = useData()
 const article = computed(() => {
   const currentPath = page.value.relativePath
   // 检查是否是文章路径
-  const matches = currentPath.match(/^articles\/([^\/]+)\/([^\/]+)\.md$/)
+  const matches = currentPath.match(/^articles\/([^/]+)\/([^/]+)\.md$/)
   if (!matches) return null
 
-  const [_, topicId, articleSlug] = matches
+  const [, topicId, articleSlug] = matches
   const topic = topicsData[topicId]
   if (!topic) return null
 

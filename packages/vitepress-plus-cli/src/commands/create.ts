@@ -85,8 +85,8 @@ function copyDirectory(src: string, dest: string): void {
     const destPath = join(dest, entry.name)
 
     // Get relative path from template root
-    const relativePath = srcPath.replace(src, '').replace(/^[\\\/]/, '')
-    
+    const relativePath = srcPath.replace(src, '').replace(/^[\\/]/, '')
+
     // Skip excluded directories
     if (excludeDirs.some(excluded => relativePath.startsWith(excluded))) {
       continue
@@ -106,15 +106,16 @@ function copyDirectory(src: string, dest: string): void {
       copyDirectory(srcPath, destPath)
     } else if (entry.isFile()) {
       // Skip hidden files except .gitignore, .env.example
-      if (entry.name.startsWith('.') && 
-          entry.name !== '.gitignore' && 
-          entry.name !== '.env.example') {
+      if (
+        entry.name.startsWith('.') &&
+        entry.name !== '.gitignore' &&
+        entry.name !== '.env.example'
+      ) {
         continue
       }
-      
+
       copyFileSync(srcPath, destPath)
       console.log(`  ✓ ${relativePath}`)
     }
   }
 }
-

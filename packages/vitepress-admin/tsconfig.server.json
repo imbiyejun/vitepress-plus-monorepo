@@ -9,4 +9,3 @@
   "include": ["server/**/*", "config/**/*"],
   "exclude": ["node_modules", "dist", "src"]
 }
-

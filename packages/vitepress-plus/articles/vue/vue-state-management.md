@@ -1,7 +1,6 @@
 ---
 title: vue-state-management
-description: 
+description:
 ---
 
 # vue-state-management
-

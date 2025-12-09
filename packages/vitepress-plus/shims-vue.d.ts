@@ -1,5 +1,3 @@
-import type { DefineComponent } from 'vue'
-
 // 为 Vitepress 组件声明类型
 declare module 'vitepress/theme' {
   import type { ComponentOptions } from 'vue'

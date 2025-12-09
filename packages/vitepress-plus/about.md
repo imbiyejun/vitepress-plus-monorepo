@@ -96,4 +96,4 @@ Mind Palace（记忆宫殿）是一个基于 VitePress 构建的个人知识管�
 
 ---
 
-*感谢您使用 Mind Palace！希望它能成为您知识管理的得力助手。* 
+_感谢您使用 Mind Palace！希望它能成为您知识管理的得力助手。_

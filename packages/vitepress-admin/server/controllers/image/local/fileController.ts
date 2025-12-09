@@ -2,7 +2,7 @@ import path from 'path'
 import fs from 'fs/promises'
 import { Request, Response } from 'express'
 import { sendSuccess, sendError } from '../../../utils/response'
-import { getProjectRoot, getPublicPath } from '../../../utils/imageUtils.js'
+import { getPublicPath } from '../../../utils/imageUtils.js'
 
 // Type definitions
 interface ImageFile {
@@ -155,9 +155,7 @@ export const renameImage = async (req: Request, res: Response) => {
 
     // Get new file info
     const stats = await fs.stat(newFullPath)
-    const newRelativePath = path
-      .relative(getPublicPath(), newFullPath)
-      .replace(/\\/g, '/')
+    const newRelativePath = path.relative(getPublicPath(), newFullPath).replace(/\\/g, '/')
 
     sendSuccess(res, {
       path: `/${newRelativePath}`,

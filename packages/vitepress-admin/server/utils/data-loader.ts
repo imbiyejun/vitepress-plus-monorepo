@@ -9,16 +9,16 @@ import type { TopicsData } from '../types/topic.js'
 export async function loadTopicsData(): Promise<TopicsData> {
   try {
     const projectRoot = getProjectRoot()
-    
+
     // Try multiple possible paths for topics data
     const possiblePaths = [
       join(projectRoot, '.vitepress/topics/data/index.ts'),
       join(projectRoot, '.vitepress/topics/data/index.js'),
       join(projectRoot, '.vitepress/topics/data/index.mjs')
     ]
-    
+
     let lastError: Error | null = null
-    
+
     for (const dataPath of possiblePaths) {
       try {
         const dataUrl = pathToFileURL(dataPath).href
@@ -32,7 +32,7 @@ export async function loadTopicsData(): Promise<TopicsData> {
         // Continue trying other paths
       }
     }
-    
+
     console.warn('Failed to load topics data from any path:', lastError)
     // Return empty object if data file doesn't exist
     return {}
@@ -64,4 +64,3 @@ export function getTopicsConfigPath(): string {
 export function getTopicDataPath(slug: string): string {
   return join(getTopicsDataPath(), slug)
 }
-

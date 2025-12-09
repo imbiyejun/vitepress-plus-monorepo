@@ -8,4 +8,4 @@ description: 技能专题展示
 import TopicsDisplay from './.vitepress/components/TopicsDisplay.vue'
 </script>
 
-<TopicsDisplay /> 
+<TopicsDisplay />

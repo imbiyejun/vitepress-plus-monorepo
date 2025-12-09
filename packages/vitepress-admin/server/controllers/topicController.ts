@@ -9,7 +9,8 @@ import { sendSuccess, sendError } from '../utils/response.js'
 import {
   getTopicsPath,
   getTopicsDataPath,
-  getArticlesPath
+  getArticlesPath,
+  getTopicsConfigPath
 } from '../config/paths.js'
 
 interface TopicMetadata {

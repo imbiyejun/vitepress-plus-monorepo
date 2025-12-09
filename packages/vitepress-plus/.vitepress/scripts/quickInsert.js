@@ -46,12 +46,13 @@ console.log('='.repeat(50))
 // 如果是Windows，尝试复制到剪贴板
 if (process.platform === 'win32') {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { spawn } = require('child_process')
     const clip = spawn('clip')
     clip.stdin.write(navigationCode)
     clip.stdin.end()
     console.log('📋 代码已复制到剪贴板！')
-  } catch (error) {
+  } catch {
     console.log('💡 提示：手动复制上面的代码')
   }
 }

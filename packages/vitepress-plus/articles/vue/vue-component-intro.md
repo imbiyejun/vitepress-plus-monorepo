@@ -1,7 +1,6 @@
 ---
 title: vue-component-intro
-description: 
+description:
 ---
 
 # vue-component-intro
-

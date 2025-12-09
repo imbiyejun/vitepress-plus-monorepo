@@ -2,13 +2,7 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 import matter from 'gray-matter'
 import type { Topic } from '../types/topic.js'
-import {
-  getProjectRoot,
-  getTopicsPath,
-  getTopicsDataPath,
-  getTopicsConfigPath,
-  getVitePressPath
-} from '../config/paths.js'
+import { getTopicsPath, getTopicsDataPath, getTopicsConfigPath } from '../config/paths.js'
 
 // 日志工具函数
 const log = {

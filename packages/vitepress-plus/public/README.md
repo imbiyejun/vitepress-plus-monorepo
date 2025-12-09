@@ -17,6 +17,7 @@ docs/public/
 ## 使用方法
 
 ### 在Vue组件中使用
+
 ```vue
 <template>
   <img src="/images/topics/vue-logo.png" alt="Vue.js" />
@@ -24,11 +25,13 @@ docs/public/
 ```
 
 ### 在Markdown文件中使用
+
 ```markdown
 ![Vue.js Logo](/images/topics/vue-logo.png)
 ```
 
 ### 在CSS中使用
+
 ```css
 .bg-image {
   background-image: url('/images/topics/background.jpg');
@@ -47,4 +50,4 @@ docs/public/
 - **Logo/图标**: PNG (支持透明背景)
 - **照片**: JPG (文件较小)
 - **简单图形**: SVG (矢量图，可缩放)
-- **现代浏览器**: WebP (更好的压缩率) 
+- **现代浏览器**: WebP (更好的压缩率)

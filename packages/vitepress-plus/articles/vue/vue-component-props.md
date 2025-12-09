@@ -1,7 +1,6 @@
 ---
 title: vue-component-props
-description: 
+description:
 ---
 
 # vue-component-props
-

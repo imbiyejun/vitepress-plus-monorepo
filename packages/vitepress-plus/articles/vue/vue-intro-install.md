@@ -3,9 +3,11 @@ layout: doc
 title: Vue.js 简介与安装
 description: 了解Vue.js的特点和优势，学习如何安装和配置Vue.js开发环境
 ---
+
 # Vue.js 简介与安装
 
 hhhh
+
 > dsafsdf
 > asdfasdf
 > adsf
@@ -22,7 +24,6 @@ conso
 
 [11111](aaaa)
 
-
 ## 什么是 Vue.js？
 
 **Vue.js**（读音类似 view）是一个构建用户界面的渐进式框架。它被设计为可以自底向上逐层应用。Vue 的核心库只关注视图层，不仅易于上手，还便于与第三方库或既有项目整合。
@@ -37,6 +38,7 @@ conso
 
 111
 222
+
 # Vue.js 简介与安装
 
 ## 什么是 Vue.js？

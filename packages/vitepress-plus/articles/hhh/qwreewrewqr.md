@@ -1,7 +1,6 @@
 ---
 title: qwerewr
-description: 
+description:
 ---
 
 # qwerewr
-

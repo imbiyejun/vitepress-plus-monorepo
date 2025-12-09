@@ -2,9 +2,9 @@
 layout: home
 
 hero:
-  name: "Mind Palace"
-  text: "个人知识管理系统"
-  tagline: "用 VitePress 构建的知识库"
+  name: 'Mind Palace'
+  text: '个人知识管理系统'
+  tagline: '用 VitePress 构建的知识库'
   actions:
     - theme: brand
       text: 开始阅读
@@ -22,4 +22,4 @@ features:
     details: 结构化的知识组织方式，提高学习和记忆效率
   - title: 💡 知识连接
     details: 建立知识点之间的关联，形成完整的知识网络
---- 
+---
