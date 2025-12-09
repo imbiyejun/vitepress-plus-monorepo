@@ -14,6 +14,7 @@
     "format": "prettier --write \"**/*.{js,ts,vue,json,css,scss,md}\"",
     "format:check": "prettier --check \"**/*.{js,ts,vue,json,css,scss,md}\"",
     "type-check": "pnpm -r --filter \"./packages/**\" type-check",
+    "type-check:staged": "node scripts/type-check-staged.mjs",
     "prepare": "husky"
   },
   "keywords": [
@@ -37,13 +38,5 @@
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.48.1",
     "vue-eslint-parser": "^10.2.0"
-  },
-  "lint-staged": {
-    "*.{js,ts,vue}": [
-      "eslint --fix --max-warnings=0"
-    ],
-    "*.{json,css,scss,md}": [
-      "prettier --write"
-    ]
   }
 }

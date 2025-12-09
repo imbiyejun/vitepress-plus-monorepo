@@ -1,1 +1,1 @@
-pnpx lint-staged && pnpm type-check
+pnpm lint-staged --quiet && pnpm type-check:staged
