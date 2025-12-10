@@ -1,8 +1,8 @@
 import { Request, Response } from 'express'
 import qiniu from 'qiniu'
-import { sendSuccess, sendError } from '../../../utils/response'
-import { getQiniuZone } from '../../../utils/imageUtils'
-import type { QiniuConfig } from '../../../types/image'
+import { sendSuccess, sendError } from '../../../utils/response.js'
+import { getQiniuZone } from '../../../utils/imageUtils.js'
+import type { QiniuConfig } from '../../../types/image.js'
 
 // Test Qiniu upload functionality with real upload
 export const testQiniuUpload = async (req: Request, res: Response) => {

@@ -1,14 +1,13 @@
 import dotenv from 'dotenv'
-import express from 'express'
-import { createServer } from 'http'
-import { WebSocketServer } from 'ws'
-import { createServer as createViteServer } from 'vite'
-import type { ViteDevServer } from 'vite'
-import categoryRoutes from './routes/categoryRoutes'
-import topicRoutes from './routes/topicRoutes'
-import imageRoutes from './routes/imageRoutes'
-import articleRoutes from './routes/articleRoutes'
-import { fileWatcher } from './services/watcher'
+import express, { type Request, type Response, type NextFunction } from 'express'
+import { createServer as createHttpServer } from 'http'
+import { WebSocketServer, type WebSocket } from 'ws'
+import { createServer as createViteServer, type ViteDevServer } from 'vite'
+import categoryRoutes from './routes/categoryRoutes.js'
+import topicRoutes from './routes/topicRoutes.js'
+import imageRoutes from './routes/imageRoutes.js'
+import articleRoutes from './routes/articleRoutes.js'
+import { fileWatcher } from './services/watcher.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getProjectRoot } from './config/paths.js'
@@ -27,20 +26,18 @@ const envPath = path.resolve(projectRoot, '.env')
 dotenv.config({ path: envPath })
 
 const app: express.Application = express()
-const PORT = process.env.PORT || 3000
+const PORT: number = Number(process.env.PORT) || 3000
 
 console.log('Project root:', projectRoot)
 console.log('Environment file:', envPath)
 
-// 请求日志中间件
-app.use((req, res, next) => {
+// Request logging middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
   const now = new Date().toLocaleString()
   const start = Date.now()
 
-  // 请求开始时打印
   console.log(`[${now}] ${req.method} ${req.url}`)
 
-  // 响应结束时打印
   res.on('finish', () => {
     const duration = Date.now() - start
     console.log(`[${now}] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`)
@@ -50,18 +47,16 @@ app.use((req, res, next) => {
   next()
 })
 
-// 中间件配置
+// Middleware config
 app.use(express.json())
 
-// 静态文件服务
-// Serve entire public directory for directory browsing
+// Static files
 const publicPath = path.join(projectRoot, 'public')
 console.log('Serving static files from:', publicPath)
 
 app.use(
   express.static(publicPath, {
-    // 设置正确的 MIME 类型
-    setHeaders: (res, filePath) => {
+    setHeaders: (res: Response, filePath: string) => {
       if (filePath.endsWith('.png')) {
         res.setHeader('Content-Type', 'image/png')
       } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
@@ -77,14 +72,14 @@ app.use(
   })
 )
 
-// 路由配置
+// Routes
 app.use('/api/categories', categoryRoutes)
-app.use('/api', topicRoutes) // 添加专题路由
-app.use('/api/images', imageRoutes) // 添加图片路由
-app.use('/api', articleRoutes) // 添加文章路由
+app.use('/api', topicRoutes)
+app.use('/api/images', imageRoutes)
+app.use('/api', articleRoutes)
 
 // Integrate Vite in development mode
-async function setupVite() {
+async function setupVite(): Promise<void> {
   if (process.env.NODE_ENV !== 'production') {
     const vite: ViteDevServer = await createViteServer({
       server: { middlewareMode: true },
@@ -93,54 +88,51 @@ async function setupVite() {
     })
     app.use(vite.middlewares)
   } else {
-    // Production mode: serve static files
-    app.use(express.static(path.resolve(__dirname, '../dist')))
+    // Production mode: serve static client files from parent dist directory
+    const distPath = path.resolve(__dirname, '..')
+    console.log('Serving static client files from:', distPath)
+    app.use(express.static(distPath))
   }
 }
 
-// 错误处理中间件
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+// Error handling middleware
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   const now = new Date().toLocaleString()
   console.error(`[${now}] Error:`, err.stack)
   console.log('-------------------')
 
-  // Prevent sending response if already sent
   if (!res.headersSent) {
     res.status(500).json({ error: '服务器内部错误' })
   }
 })
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-  // Don't exit the process, just log the error
 })
 
 // Handle uncaught exceptions
-process.on('uncaughtException', error => {
+process.on('uncaughtException', (error: Error) => {
   console.error('Uncaught Exception:', error)
-  // Don't exit the process, just log the error
 })
 
-// 创建HTTP服务器
-const server = createServer(app)
+// Create HTTP server
+const server = createHttpServer(app)
 
-// 创建WebSocket服务器
+// Create WebSocket server
 const wss = new WebSocketServer({ server })
 
-// WebSocket连接处理
-wss.on('connection', ws => {
+// WebSocket connection handling
+wss.on('connection', (ws: WebSocket) => {
   console.log('新的WebSocket连接')
 
-  // 将客户端添加到文件监听器
   fileWatcher.addClient(ws)
 
   ws.on('error', console.error)
 })
 
-// 启动服务器
-async function startServer() {
-  // Setup Vite middleware
+// Start server
+async function startServer(): Promise<void> {
   await setupVite()
 
   server.listen(PORT, () => {
@@ -151,7 +143,7 @@ async function startServer() {
   })
 }
 
-startServer().catch(err => {
+startServer().catch((err: Error) => {
   console.error('Failed to start server:', err)
   process.exit(1)
 })

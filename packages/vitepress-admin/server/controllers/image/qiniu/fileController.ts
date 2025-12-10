@@ -1,10 +1,10 @@
 import path from 'path'
 import { Request, Response } from 'express'
 import qiniu from 'qiniu'
-import { sendSuccess, sendError } from '../../../utils/response'
-import { getQiniuZone } from '../../../utils/imageUtils'
-import { loadQiniuConfig } from './configHelper'
-import type { DirectoryItem, Breadcrumb } from '../../../types/image'
+import { sendSuccess, sendError } from '../../../utils/response.js'
+import { getQiniuZone } from '../../../utils/imageUtils.js'
+import { loadQiniuConfig } from './configHelper.js'
+import type { DirectoryItem, Breadcrumb } from '../../../types/image.js'
 
 // Get Qiniu images list with directory support, pagination and search
 export const getQiniuImages = async (req: Request, res: Response) => {

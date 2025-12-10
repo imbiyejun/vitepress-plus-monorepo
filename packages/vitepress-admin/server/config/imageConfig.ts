@@ -1,4 +1,4 @@
-import type { ImageConfig, QiniuConfig, LocalConfig } from '../types/image'
+import type { ImageConfig, QiniuConfig, LocalConfig } from '../types/image.js'
 
 // Load image configuration from environment variables
 export const loadImageConfigFromEnv = (): ImageConfig => {

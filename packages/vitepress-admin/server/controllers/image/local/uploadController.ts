@@ -3,9 +3,9 @@ import fs from 'fs/promises'
 import { Request, Response } from 'express'
 import multer from 'multer'
 import busboy from 'busboy'
-import { sendSuccess, sendError } from '../../../utils/response'
+import { sendSuccess, sendError } from '../../../utils/response.js'
 import { getPublicPath } from '../../../utils/imageUtils.js'
-import type { UploadRequest } from '../../../types/image'
+import type { UploadRequest } from '../../../types/image.js'
 
 // Create dynamic multer storage based on request
 export const createStorage = (uploadPath: string = '') => {

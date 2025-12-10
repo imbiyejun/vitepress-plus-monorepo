@@ -14,7 +14,7 @@ export {
   createDirectory,
   deleteDirectory,
   getLocalDirectories
-} from './local'
+} from './local/index.js'
 
 // Export all Qiniu cloud image management functions
 export {
@@ -26,7 +26,7 @@ export {
   createQiniuDirectory,
   deleteQiniuDirectory,
   getQiniuDirectories
-} from './qiniu'
+} from './qiniu/index.js'
 
 // Export configuration management functions
-export { getImageConfig, testQiniuUpload } from './config'
+export { getImageConfig, testQiniuUpload } from './config/index.js'

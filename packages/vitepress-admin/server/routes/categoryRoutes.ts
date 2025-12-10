@@ -7,7 +7,7 @@ import {
   deleteCategory,
   updateCategoriesOrder,
   addTopic
-} from '../controllers/categoryController'
+} from '../controllers/categoryController.js'
 
 const router: ExpressRouter = Router()
 

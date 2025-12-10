@@ -13,13 +13,17 @@
   "files": [
     "dist",
     "bin",
+    "server",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon --watch server -e ts --exec \"tsx server/index.ts\"",
-    "build": "npm run build:client && npm run build:cli",
+    "dev:cli": "tsx cli/index.ts",
+    "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
+    "build": "npm run clean && npm run build:client && npm run build:server && npm run build:cli",
     "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
     "build:cli": "tsc -p tsconfig.cli.json",
     "type-check": "vue-tsc --noEmit && tsc --project tsconfig.server.json --noEmit && tsc --project tsconfig.cli.json --noEmit",
     "type-check:client": "vue-tsc --noEmit",

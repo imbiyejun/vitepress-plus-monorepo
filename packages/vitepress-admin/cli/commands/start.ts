@@ -1,7 +1,8 @@
 import { Command } from 'commander'
-import { spawn } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 import open from 'open'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -24,7 +25,6 @@ export function startCommand(): Command {
     .action(async (options: StartOptions) => {
       const { port = '3000', open: shouldOpen = false, root = process.cwd() } = options
 
-      // Resolve to absolute path
       const absoluteRoot = path.resolve(root)
 
       console.log('\n🚀 Starting VitePress Admin...\n')
@@ -32,26 +32,51 @@ export function startCommand(): Command {
       console.log(`🌐 Server port: ${port}`)
       console.log('-------------------\n')
 
-      // Server path (Vite is integrated as Express middleware)
-      // When compiled, this file is in dist/cli/commands, need to go up to package root
       const packageRoot = path.resolve(__dirname, '../../..')
-      const serverPath = path.join(packageRoot, 'server/index.ts')
 
-      // Start server with integrated Vite
-      const serverProcess = spawn('npx', ['tsx', serverPath], {
+      // Check DEBUG_SOURCE env to decide whether to use source or dist
+      const useSource = process.env.DEBUG_SOURCE === 'true'
+
+      let serverPath: string
+      let command: string
+      let args: string[]
+
+      if (useSource) {
+        // Debug mode: use tsx to run source
+        serverPath = path.join(packageRoot, 'server/index.ts')
+        const isWindows = process.platform === 'win32'
+        command = isWindows ? 'npx.cmd' : 'npx'
+        args = ['tsx', serverPath]
+        console.log('🔧 Debug mode: running from source files')
+      } else {
+        // Production mode: use compiled dist
+        serverPath = path.join(packageRoot, 'dist/server/index.js')
+
+        if (!fs.existsSync(serverPath)) {
+          console.error('❌ Error: Compiled server not found.')
+          console.error('Please run "pnpm run build" in vitepress-admin package first.')
+          console.error('Or set DEBUG_SOURCE=true to run from source files.')
+          process.exit(1)
+        }
+
+        command = 'node'
+        args = [serverPath]
+      }
+
+      const serverProcess: ChildProcess = spawn(command, args, {
         stdio: 'inherit',
-        shell: true,
+        shell: false,
         env: {
           ...process.env,
           PORT: port,
           PROJECT_ROOT: absoluteRoot,
-          NODE_ENV: 'development'
+          NODE_ENV: useSource ? 'development' : 'production'
         },
         cwd: packageRoot
       })
 
       // Handle process termination
-      const cleanup = () => {
+      const cleanup = (): void => {
         console.log('\n\n👋 Shutting down VitePress Admin...')
         serverProcess.kill()
         process.exit(0)
@@ -73,7 +98,7 @@ export function startCommand(): Command {
       }
 
       // Handle server errors
-      serverProcess.on('error', error => {
+      serverProcess.on('error', (error: Error) => {
         console.error('❌ Server error:', error)
         cleanup()
       })

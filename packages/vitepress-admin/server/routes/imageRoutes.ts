@@ -19,7 +19,7 @@ import {
   deleteQiniuDirectory,
   getQiniuDirectories,
   getLocalDirectories
-} from '../controllers/image'
+} from '../controllers/image/index.js'
 
 const router: express.Router = express.Router()
 

@@ -1,5 +1,5 @@
 // Export upload-related functions
-export { uploadToQiniu } from './uploadController'
+export { uploadToQiniu } from './uploadController.js'
 
 // Export file operation functions
 export {
@@ -7,11 +7,11 @@ export {
   deleteQiniuImage,
   renameQiniuImage,
   downloadQiniuImage
-} from './fileController'
+} from './fileController.js'
 
 // Export directory operation functions
 export {
   createQiniuDirectory,
   deleteQiniuDirectory,
   getQiniuDirectories
-} from './directoryController'
+} from './directoryController.js'

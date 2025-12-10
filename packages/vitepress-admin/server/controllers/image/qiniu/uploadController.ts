@@ -2,9 +2,9 @@ import path from 'path'
 import { Request, Response } from 'express'
 import qiniu from 'qiniu'
 import busboy from 'busboy'
-import { sendSuccess, sendError } from '../../../utils/response'
-import { getQiniuZone } from '../../../utils/imageUtils'
-import { loadQiniuConfig } from './configHelper'
+import { sendSuccess, sendError } from '../../../utils/response.js'
+import { getQiniuZone } from '../../../utils/imageUtils.js'
+import { loadQiniuConfig } from './configHelper.js'
 
 // Upload images to Qiniu cloud
 export const uploadToQiniu = async (req: Request, res: Response) => {

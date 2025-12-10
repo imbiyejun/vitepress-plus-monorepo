@@ -9,7 +9,7 @@ import {
   updateTopicDetail,
   deleteTopic,
   updateTopicsOrder
-} from '../controllers/topicController'
+} from '../controllers/topicController.js'
 
 const router: ExpressRouter = Router()
 

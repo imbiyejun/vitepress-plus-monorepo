@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
-import { sendSuccess, sendError } from '../../../utils/response'
-import { loadImageConfigFromEnv } from '../../../config/imageConfig'
+import { sendSuccess, sendError } from '../../../utils/response.js'
+import { loadImageConfigFromEnv } from '../../../config/imageConfig.js'
 
 // Get image configuration from environment variables
 export const getImageConfig = async (_req: Request, res: Response) => {

@@ -6,10 +6,10 @@ export {
   handleMulterError,
   uploadImages,
   uploadImagesWithPath
-} from './uploadController'
+} from './uploadController.js'
 
 // Export file operation functions
-export { getAllImages, deleteImage, renameImage, checkImageName } from './fileController'
+export { getAllImages, deleteImage, renameImage, checkImageName } from './fileController.js'
 
 // Export directory operation functions
 export {
@@ -17,4 +17,4 @@ export {
   createDirectory,
   deleteDirectory,
   getLocalDirectories
-} from './directoryController'
+} from './directoryController.js'

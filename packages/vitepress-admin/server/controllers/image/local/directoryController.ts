@@ -1,9 +1,9 @@
 import path from 'path'
 import fs from 'fs/promises'
 import { Request, Response } from 'express'
-import { sendSuccess, sendError } from '../../../utils/response'
+import { sendSuccess, sendError } from '../../../utils/response.js'
 import { getPublicPath } from '../../../utils/imageUtils.js'
-import type { DirectoryItem, Breadcrumb } from '../../../types/image'
+import type { DirectoryItem, Breadcrumb } from '../../../types/image.js'
 
 // Get directory contents with files and folders, with search support
 export const getDirectoryContents = async (req: Request, res: Response) => {

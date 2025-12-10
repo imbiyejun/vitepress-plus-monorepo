@@ -1,7 +1,7 @@
 import path from 'path'
 import fs from 'fs/promises'
 import { Request, Response } from 'express'
-import { sendSuccess, sendError } from '../../../utils/response'
+import { sendSuccess, sendError } from '../../../utils/response.js'
 import { getPublicPath } from '../../../utils/imageUtils.js'
 
 // Type definitions
