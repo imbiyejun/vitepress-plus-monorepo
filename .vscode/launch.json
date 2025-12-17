@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug VitePress Admin Server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "tsx", "server/index.ts"],
+      "cwd": "${workspaceFolder}/packages/vitepress-admin",
+      "env": {
+        "NODE_ENV": "development",
+        "DEBUG_SOURCE": "true",
+        "ROOT_DIR": "${workspaceFolder}/packages/vitepress-plus"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "Debug VitePress Admin CLI",
+      "command": "pnpm exec tsx cli/index.ts start -r ${workspaceFolder}/packages/vitepress-plus",
+      "cwd": "${workspaceFolder}/packages/vitepress-admin",
+      "env": {
+        "NODE_ENV": "development",
+        "DEBUG_SOURCE": "true"
+      },
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}
