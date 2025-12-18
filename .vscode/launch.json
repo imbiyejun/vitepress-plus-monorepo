@@ -28,6 +28,14 @@
         "DEBUG_SOURCE": "true"
       },
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "Debug VitePress Plus CLI",
+      "command": "pnpm exec tsx src/index.ts create ${workspaceFolder}/examples/test-project --force",
+      "cwd": "${workspaceFolder}/packages/vitepress-plus-cli",
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }

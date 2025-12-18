@@ -3,7 +3,5 @@ dist
 .DS_Store
 .idea
 .git
-docs/.vitepress/cache/
-
-# Test projects
-test-*
+.vitepress/cache
+.vitepress/dist
