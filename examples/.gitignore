@@ -3,5 +3,5 @@ dist
 .DS_Store
 .idea
 .git
-.vitepress/cache
-.vitepress/dist
+**/.vitepress/cache
+**/.vitepress/dist
