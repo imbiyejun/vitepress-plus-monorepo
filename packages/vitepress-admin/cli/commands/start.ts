@@ -32,21 +32,27 @@ export function startCommand(): Command {
       console.log(`🌐 Server port: ${port}`)
       console.log('-------------------\n')
 
-      const packageRoot = path.resolve(__dirname, '../../..')
-
       // Check DEBUG_SOURCE env to decide whether to use source or dist
       const useSource = process.env.DEBUG_SOURCE === 'true'
+
+      // Calculate package root based on source or dist mode
+      // Source: cli/commands/start.ts -> ../.. -> vitepress-admin
+      // Dist: dist/cli/commands/start.js -> ../../.. -> vitepress-admin
+      const packageRoot = useSource
+        ? path.resolve(__dirname, '../..')
+        : path.resolve(__dirname, '../../..')
 
       let serverPath: string
       let command: string
       let args: string[]
 
       if (useSource) {
-        // Debug mode: use tsx to run source
+        // Debug mode: use pnpm exec tsx to run source
         serverPath = path.join(packageRoot, 'server/index.ts')
+
         const isWindows = process.platform === 'win32'
-        command = isWindows ? 'npx.cmd' : 'npx'
-        args = ['tsx', serverPath]
+        command = isWindows ? 'pnpm.cmd' : 'pnpm'
+        args = ['exec', 'tsx', serverPath]
         console.log('🔧 Debug mode: running from source files')
       } else {
         // Production mode: use compiled dist

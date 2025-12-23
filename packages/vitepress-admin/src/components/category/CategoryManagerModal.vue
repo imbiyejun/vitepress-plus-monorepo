@@ -15,6 +15,12 @@
           <span>管理专题大类</span>
           <div class="modal-actions">
             <a-space>
+              <a-button size="small" @click="toggleAllCategories">
+                <template #icon>
+                  <CaretDownOutlined :class="['expand-icon', { expanded: allExpanded }]" />
+                </template>
+                {{ allExpanded ? '全部收起' : '全部展开' }}
+              </a-button>
               <span>每行显示：</span>
               <a-select v-model:value="cardsPerRow" style="width: 80px">
                 <a-select-option :value="1">1个</a-select-option>
@@ -49,15 +55,6 @@
                     <span class="category-count">{{ category.topics.length }}</span>
                   </span>
                   <div class="category-actions">
-                    <a-button
-                      type="text"
-                      class="category-expand"
-                      @click.stop="toggleCategoryExpand(category.id)"
-                    >
-                      <CaretDownOutlined
-                        :class="['expand-icon', { expanded: expandedCategories[category.id] }]"
-                      />
-                    </a-button>
                     <a-button
                       type="text"
                       class="category-edit"
@@ -216,7 +213,8 @@ const handleEditCategory = (category: Category) => {
 // 每行显示的卡片数量
 const cardsPerRow = ref(3)
 
-// 展开状态控制
+// Global expand/collapse state
+const allExpanded = ref(false)
 const expandedCategories = ref<Record<string, boolean>>({})
 
 // 记录原始顺序
@@ -231,38 +229,27 @@ const hasTopicOrderChanged = ref(false)
 const router = useRouter()
 const route = useRoute()
 
-// 监听弹窗打开
-watch(
-  () => props.modelValue,
-  newValue => {
-    if (newValue) {
-      // 默认展开所有分类
-      props.categories.forEach(category => {
-        expandedCategories.value[category.id] = true
-      })
-    }
-  }
-)
-
-// 监听props.categories的变化
+// Watch props.categories changes
 watch(
   () => props.categories,
   newCategories => {
-    // 创建深拷贝，避免直接修改props
+    // Create deep copy to avoid directly modifying props
     categoriesData.value = JSON.parse(JSON.stringify(newCategories))
-    // 保存当前的展开状态
+    // Keep current expand state
     const currentExpandedState = { ...expandedCategories.value }
-    // 确保所有分类都是展开状态
+    // Initialize expand state for new categories
     newCategories.forEach(category => {
-      currentExpandedState[category.id] = true
+      if (!(category.id in currentExpandedState)) {
+        currentExpandedState[category.id] = allExpanded.value
+      }
     })
-    // 更新展开状态
+    // Update expand state
     expandedCategories.value = currentExpandedState
-    // 更新原始顺序（用于检测变化）
+    // Update original order for change detection
     originalOrder.value = categoriesData.value.map(category => category.id)
-    // 保存专题的原始顺序
+    // Save original topics order
     saveOriginalTopicsOrder()
-    // 重置变更状态
+    // Reset change state
     hasOrderChanged.value = false
     hasTopicOrderChanged.value = false
   },
@@ -283,9 +270,12 @@ const saveOriginalTopicsOrder = () => {
   })
 }
 
-// 切换分类展开状态
-const toggleCategoryExpand = (categoryId: string) => {
-  expandedCategories.value[categoryId] = !expandedCategories.value[categoryId]
+// Toggle all categories expand/collapse state
+const toggleAllCategories = () => {
+  allExpanded.value = !allExpanded.value
+  categoriesData.value.forEach(category => {
+    expandedCategories.value[category.id] = allExpanded.value
+  })
 }
 
 // 删除分类
@@ -375,17 +365,18 @@ const handleSaveCategories = async () => {
   emit('update:modelValue', false)
 }
 
-// 监听弹窗打开，重置状态
+// Watch modal open, reset state
 watch(
   () => props.modelValue,
   newValue => {
     if (newValue) {
       hasOrderChanged.value = false
       hasTopicOrderChanged.value = false
-      // 保存打开弹窗时的顺序
+      // Save original order when opening modal
       originalOrder.value = props.categories.map(category => category.id)
       saveOriginalTopicsOrder()
-      // 默认收起所有分类
+      // Default to collapsed state
+      allExpanded.value = false
       props.categories.forEach(category => {
         expandedCategories.value[category.id] = false
       })

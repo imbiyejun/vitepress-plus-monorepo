@@ -3,6 +3,13 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 import { sendSuccess, sendError } from '../utils/response.js'
 import { getTopicsConfigPath, getTopicsDataPath } from '../config/paths.js'
+import {
+  addCategoryToAST,
+  deleteCategoryFromAST,
+  updateCategoryInAST,
+  reorderCategoriesInAST,
+  addTopicToAST
+} from '../utils/astHelper.js'
 
 // Type definitions
 interface TopicCategory {
@@ -34,12 +41,6 @@ interface Article {
 interface TopicData {
   chapters?: Chapter[]
 }
-
-type FormatValue = string | number | boolean | null | FormatObject | FormatArray
-interface FormatObject {
-  [key: string]: FormatValue
-}
-type FormatArray = FormatValue[]
 
 // Path getters
 const getTopicsConfigFile = () => join(getTopicsConfigPath(), 'index.ts')
@@ -166,21 +167,17 @@ export const addCategory = async (req: Request, res: Response) => {
       return sendError(res, '专题大类名称或标识已存在，请使用其他名称或标识', 400)
     }
 
-    // 读取当前配置文件内容
+    // Read current config file
     const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
 
-    // 构建新的分类对象
-    const newCategory = `  {
-    title: '${title}',
-    id: '${slug}',
-    slug: '${slug}',
-    items: []
-  }`
+    // Use AST to add new category
+    const updatedContent = await addCategoryToAST(fileContent, {
+      title,
+      id: slug,
+      slug
+    })
 
-    // 在数组末尾插入新分类
-    const updatedContent = fileContent.replace(/(\n])/, `,\n${newCategory}\n]`)
-
-    // 写入文件
+    // Write file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     // 返回与getCategories一致的数据结构
@@ -236,56 +233,26 @@ export const updateCategory = async (req: Request, res: Response) => {
       return sendError(res, '专题大类名称或标识已存在，请使用其他名称或标识', 400)
     }
 
-    // 更新分类信息
-    categoryToUpdate.title = title
-    categoryToUpdate.slug = slug
-    categoryToUpdate.id = slug // 保持id和slug一致
+    // Read current config file
+    const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
 
-    // 更新该分类下所有专题的categoryId
-    categoryToUpdate.items.forEach(item => {
-      item.categoryId = slug
-    })
+    // Use AST to update category
+    const updatedContent = await updateCategoryInAST(fileContent, id, { title, slug })
 
-    // 生成新的文件内容
-    const formatObject = (obj: FormatValue | TopicCategory[], indent = 0): string => {
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return '[]'
-
-        const items = obj.map(
-          item => `${' '.repeat(indent + 2)}${formatObject(item as FormatValue, indent + 2)}`
-        )
-        return `[\n${items.join(',\n')}\n${' '.repeat(indent)}]`
-      }
-
-      if (typeof obj === 'object' && obj !== null) {
-        const entries = Object.entries(obj)
-        if (entries.length === 0) return '{}'
-        const items = entries.map(([key, value]) => {
-          const formattedValue =
-            typeof value === 'string'
-              ? `'${value}'`
-              : formatObject(value as FormatValue, indent + 2)
-          return `${' '.repeat(indent + 2)}${key}: ${formattedValue}`
-        })
-        return `{\n${items.join(',\n')}\n${' '.repeat(indent)}}`
-      }
-
-      return String(obj)
-    }
-
-    const updatedContent = `import { TopicCategory } from './types'
-
-export const topics: TopicCategory[] = ${formatObject(topics)}
-
-export * from './types'
-`
-
-    // 写入配置文件
+    // Write config file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
-    // 更新专题数据文件中的categoryId
+    // Re-read updated config to get the updated category
+    const updatedTopics = await readTopicsConfig()
+    const updatedCategory = updatedTopics.find(cat => cat.id === slug)
+
+    if (!updatedCategory) {
+      return sendError(res, '更新后的分类未找到', 500)
+    }
+
+    // Update categoryId in topic data files
     await Promise.all(
-      categoryToUpdate.items.map(async topic => {
+      updatedCategory.items.map(async topic => {
         const topicDataFile = join(getTopicsDataDir(), topic.slug, 'index.ts')
         try {
           const content = await fs.readFile(topicDataFile, 'utf-8')
@@ -296,19 +263,18 @@ export * from './types'
           await fs.writeFile(topicDataFile, updatedContent, 'utf-8')
         } catch (error) {
           console.error(`更新专题 ${topic.slug} 的数据文件失败:`, error)
-          // 继续处理其他专题，不中断整个流程
         }
       })
     )
 
-    // 返回更新后的分类数据
+    // Return updated category data
     sendSuccess(
       res,
       {
-        id: categoryToUpdate.id,
-        name: categoryToUpdate.title,
-        slug: categoryToUpdate.slug,
-        topics: categoryToUpdate.items.map(item => ({
+        id: updatedCategory.id,
+        name: updatedCategory.title,
+        slug: updatedCategory.slug,
+        topics: updatedCategory.items.map(item => ({
           id: item.id,
           title: item.name,
           description: item.description,
@@ -331,11 +297,10 @@ export const deleteCategory = async (req: Request, res: Response) => {
       return sendError(res, '分类ID不能为空', 400)
     }
 
-    // 读取当前配置文件内容
-    await fs.readFile(getTopicsConfigFile(), 'utf-8')
+    // Read current config
     const topics = await readTopicsConfig()
 
-    // 查找要删除的分类
+    // Find category to delete
     const categoryToDelete = topics.find(category => category.id === id)
     if (!categoryToDelete) {
       return sendError(res, '分类不存在', 404)
@@ -346,44 +311,13 @@ export const deleteCategory = async (req: Request, res: Response) => {
       return sendError(res, '该分类下还有专题，无法删除', 400)
     }
 
-    // 过滤掉要删除的分类
-    const updatedTopics = topics.filter(category => category.id !== id)
+    // Read current config file
+    const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
 
-    // 生成新的文件内容，保持与 Prettier 格式化一致的风格
-    const formatObject = (obj: FormatValue | TopicCategory[], indent = 0): string => {
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return '[]'
+    // Use AST to delete category
+    const updatedContent = await deleteCategoryFromAST(fileContent, id)
 
-        const items = obj.map(
-          item => `${' '.repeat(indent + 2)}${formatObject(item as FormatValue, indent + 2)}`
-        )
-        return `[\n${items.join(',\n')}\n${' '.repeat(indent)}]`
-      }
-
-      if (typeof obj === 'object' && obj !== null) {
-        const entries = Object.entries(obj)
-        if (entries.length === 0) return '{}'
-        const items = entries.map(([key, value]) => {
-          const formattedValue =
-            typeof value === 'string'
-              ? `'${value}'`
-              : formatObject(value as FormatValue, indent + 2)
-          return `${' '.repeat(indent + 2)}${key}: ${formattedValue}`
-        })
-        return `{\n${items.join(',\n')}\n${' '.repeat(indent)}}`
-      }
-
-      return String(obj)
-    }
-
-    const updatedContent = `import { TopicCategory} from './types'
-
-export const topics: TopicCategory[] = ${formatObject(updatedTopics)}
-
-export * from './types'
-`
-
-    // 写入文件
+    // Write file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     sendSuccess(res, null, '删除成功')
@@ -400,58 +334,23 @@ export const updateCategoriesOrder = async (req: Request, res: Response) => {
       return sendError(res, '数据格式不正确', 400)
     }
 
-    // 读取当前配置文件内容
-    await fs.readFile(getTopicsConfigFile(), 'utf-8')
+    // Read current config
     const topics = await readTopicsConfig()
 
-    // 验证所有提交的分类ID是否有效
+    // Validate all submitted category IDs
     const validIds = new Set(topics.map(t => t.id))
     const allIdsValid = categories.every(id => validIds.has(id))
     if (!allIdsValid) {
       return sendError(res, '存在无效的分类ID', 400)
     }
 
-    // 根据新顺序重新排列分类
-    const orderedTopics = categories.map(id => topics.find(t => t.id === id))
+    // Read current config file
+    const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
 
-    // 生成新的文件内容
-    const formatObject = (
-      obj: FormatValue | TopicCategory[] | (TopicCategory | undefined)[],
-      indent = 0
-    ): string => {
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return '[]'
+    // Use AST to reorder categories
+    const updatedContent = await reorderCategoriesInAST(fileContent, categories)
 
-        const items = obj.map(
-          item => `${' '.repeat(indent + 2)}${formatObject(item as FormatValue, indent + 2)}`
-        )
-        return `[\n${items.join(',\n')}\n${' '.repeat(indent)}]`
-      }
-
-      if (typeof obj === 'object' && obj !== null) {
-        const entries = Object.entries(obj)
-        if (entries.length === 0) return '{}'
-        const items = entries.map(([key, value]) => {
-          const formattedValue =
-            typeof value === 'string'
-              ? `'${value}'`
-              : formatObject(value as FormatValue, indent + 2)
-          return `${' '.repeat(indent + 2)}${key}: ${formattedValue}`
-        })
-        return `{\n${items.join(',\n')}\n${' '.repeat(indent)}}`
-      }
-
-      return String(obj)
-    }
-
-    const updatedContent = `import { TopicCategory } from './types'
-
-export const topics: TopicCategory[] = ${formatObject(orderedTopics)}
-
-export * from './types'
-`
-
-    // 写入文件
+    // Write file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     sendSuccess(res, null, '更新成功')
@@ -485,8 +384,8 @@ export const addTopic = async (req: Request, res: Response) => {
       return sendError(res, '专题标识已存在，请使用其他标识', 400)
     }
 
-    // 创建新的专题对象，ID与slug保持一致
-    const newTopic = {
+    // Create new topic object
+    const newTopic: TopicItem = {
       id: slug,
       categoryId: categoryId,
       name: name,
@@ -495,44 +394,13 @@ export const addTopic = async (req: Request, res: Response) => {
       image: image || ''
     }
 
-    // 将新专题添加到指定分类
-    category.items.push(newTopic)
+    // Read current config file
+    const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
 
-    // 生成新的文件内容
-    const formatObject = (obj: FormatValue | TopicCategory[], indent = 0): string => {
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return '[]'
+    // Use AST to add topic to category
+    const updatedContent = await addTopicToAST(fileContent, categoryId, newTopic)
 
-        const items = obj.map(
-          item => `${' '.repeat(indent + 2)}${formatObject(item as FormatValue, indent + 2)}`
-        )
-        return `[\n${items.join(',\n')}\n${' '.repeat(indent)}]`
-      }
-
-      if (typeof obj === 'object' && obj !== null) {
-        const entries = Object.entries(obj)
-        if (entries.length === 0) return '{}'
-        const items = entries.map(([key, value]) => {
-          const formattedValue =
-            typeof value === 'string'
-              ? `'${value}'`
-              : formatObject(value as FormatValue, indent + 2)
-          return `${' '.repeat(indent + 2)}${key}: ${formattedValue}`
-        })
-        return `{\n${items.join(',\n')}\n${' '.repeat(indent)}}`
-      }
-
-      return String(obj)
-    }
-
-    const updatedContent = `import { TopicCategory } from './types'
-
-export const topics: TopicCategory[] = ${formatObject(topics)}
-
-export * from './types'
-`
-
-    // 写入配置文件
+    // Write config file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     // 生成专题数据文件
