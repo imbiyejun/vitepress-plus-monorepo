@@ -3,6 +3,7 @@ import { join } from 'path'
 import matter from 'gray-matter'
 import type { Topic } from '../types/topic.js'
 import { getTopicsPath, getTopicsDataPath, getTopicsConfigPath } from '../config/paths.js'
+import { deleteTopicFromAST } from '../utils/astHelper.js'
 
 // 日志工具函数
 const log = {
@@ -170,86 +171,13 @@ async function removeFromMainDataFile(slug: string) {
   }
 }
 
-// 从topics配置文件中删除专题
+// Remove topic from topics config file using AST
 async function removeFromTopicsConfig(slug: string) {
   const configPath = join(getTopicsConfigDir(), 'index.ts')
 
   try {
-    // 读取现有文件内容
     const content = await fs.readFile(configPath, 'utf-8')
-
-    // 使用正则表达式提取topics数组的内容
-    const match = content.match(/export const topics[^=]+=\s*(\[[\s\S]*?\n])/m)
-    if (!match) {
-      throw new Error('无法解析topics配置')
-    }
-
-    // 将TypeScript代码转换为可执行的JavaScript代码
-    const arrayContent = match[1]
-      .replace(/\n\s*\/\/[^\n]*/g, '') // 移除注释
-      .replace(/\s*,\s*\n\s*]/g, '\n]') // 处理最后一个逗号
-
-    // 使用Function构造器创建一个安全的求值环境
-    const fn = new Function(`return ${arrayContent}`)
-    const topics = fn()
-
-    interface CategoryItem {
-      slug: string
-      [key: string]: unknown
-    }
-
-    interface Category {
-      items: CategoryItem[]
-      [key: string]: unknown
-    }
-
-    // 从topics中删除指定的专题
-    const updatedTopics = (topics as Category[]).map(category => ({
-      ...category,
-      items: category.items.filter(item => item.slug !== slug)
-    }))
-
-    type FormatValue = string | number | boolean | null | FormatObject | FormatArray
-    interface FormatObject {
-      [key: string]: FormatValue
-    }
-    type FormatArray = FormatValue[]
-
-    // 生成新的文件内容
-    const formatObject = (obj: FormatValue | Category[], indent = 0): string => {
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return '[]'
-
-        const items = obj.map(
-          item => `${' '.repeat(indent + 2)}${formatObject(item as FormatValue, indent + 2)}`
-        )
-        return `[\n${items.join(',\n')}\n${' '.repeat(indent)}]`
-      }
-
-      if (typeof obj === 'object' && obj !== null) {
-        const entries = Object.entries(obj)
-        if (entries.length === 0) return '{}'
-        const items = entries.map(([key, value]) => {
-          const formattedValue =
-            typeof value === 'string'
-              ? `'${value}'`
-              : formatObject(value as FormatValue, indent + 2)
-          return `${' '.repeat(indent + 2)}${key}: ${formattedValue}`
-        })
-        return `{\n${items.join(',\n')}\n${' '.repeat(indent)}}`
-      }
-
-      return String(obj)
-    }
-
-    const updatedContent = `import { TopicCategory } from './types'
-
-export const topics: TopicCategory[] = ${formatObject(updatedTopics)}
-
-export * from './types'
-`
-
-    // 写入文件
+    const updatedContent = await deleteTopicFromAST(content, slug)
     await fs.writeFile(configPath, updatedContent, 'utf-8')
   } catch (error) {
     console.error('更新topics配置文件失败:', error)

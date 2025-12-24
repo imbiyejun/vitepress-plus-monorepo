@@ -1,4 +1,5 @@
 import { TopicCategory } from './types'
+
 export const topics: TopicCategory[] = [
   {
     title: '前端技术',
@@ -117,10 +118,17 @@ export const topics: TopicCategory[] = [
     items: []
   },
   {
-    title: 'bb',
+    title: 'cc',
+    id: 'cc',
+    slug: 'cc',
+    items: []
+  },
+  {
+    title: 'bb1',
     id: 'bb',
     slug: 'bb',
     items: []
   }
 ]
+
 export * from './types'

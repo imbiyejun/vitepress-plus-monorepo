@@ -4,6 +4,8 @@ import generateModule from '@babel/generator'
 import * as t from '@babel/types'
 import type { NodePath } from '@babel/traverse'
 import prettier from 'prettier'
+import { getProjectRoot } from '../config/paths.js'
+import path from 'path'
 
 // Handle ESM/CJS compatibility
 const traverse =
@@ -20,22 +22,60 @@ async function generateCode(ast: t.File): Promise<string> {
     {
       retainLines: false,
       compact: false,
-      concise: false
+      concise: false,
+      jsescOption: {
+        minimal: true // Don't escape Unicode characters
+      }
     },
     ''
   )
 
-  // Format with prettier
+  // Use project's prettier config
+  const projectRoot = getProjectRoot()
+  const prettierConfig = await prettier.resolveConfig(projectRoot)
+
+  // Format with prettier using project config
   const formatted = await prettier.format(output.code, {
+    ...prettierConfig,
     parser: 'typescript',
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'none',
-    printWidth: 100,
-    tabWidth: 2
+    filepath: path.join(projectRoot, '.vitepress/topics/config/index.ts')
   })
 
-  return formatted
+  // Ensure consistent blank lines - simple and reliable approach
+  const lines = formatted.split('\n')
+  const result: string[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+    const nextLine = lines[i + 1]
+
+    result.push(line)
+
+    // Ensure blank line between import and export
+    if (
+      line.includes('from') &&
+      line.trim().startsWith('import') &&
+      nextLine &&
+      nextLine.trim().startsWith('export const')
+    ) {
+      // Check if next line is already blank
+      if (nextLine.trim() !== '') {
+        result.push('')
+      }
+    }
+    // Ensure blank line between ] and export *
+    else if (line.trim() === ']' && nextLine && nextLine.trim().startsWith('export *')) {
+      // Check if next line is already blank
+      if (nextLine.trim() !== '') {
+        result.push('')
+      }
+    }
+
+    i++
+  }
+
+  return result.join('\n')
 }
 
 interface TopicItem {
@@ -384,6 +424,328 @@ export async function addTopicToAST(
                 const topicObj = objectToAST(newTopic as unknown as Record<string, unknown>)
                 itemsProp.value.elements.push(topicObj)
               }
+            }
+          })
+        }
+      }
+    }
+  })
+
+  return await generateCode(ast)
+}
+
+/**
+ * Update a topic in topics array
+ */
+export async function updateTopicInAST(
+  content: string,
+  topicId: string,
+  newCategoryId: string,
+  updates: Partial<TopicItem>
+): Promise<string> {
+  const ast = parseConfigFile(content)
+
+  let oldCategoryId: string | null = null
+  let topicToMove: t.ObjectExpression | null = null
+
+  // Find and remove topic from old category
+  traverse(ast, {
+    ExportNamedDeclaration(path: NodePath<t.ExportNamedDeclaration>) {
+      const declaration = path.node.declaration
+
+      if (
+        t.isVariableDeclaration(declaration) &&
+        declaration.declarations[0] &&
+        t.isVariableDeclarator(declaration.declarations[0]) &&
+        t.isIdentifier(declaration.declarations[0].id) &&
+        declaration.declarations[0].id.name === 'topics'
+      ) {
+        const init = declaration.declarations[0].init
+
+        if (t.isArrayExpression(init)) {
+          init.elements.forEach(element => {
+            if (!t.isObjectExpression(element)) return
+
+            const itemsProp = element.properties.find(
+              prop =>
+                t.isObjectProperty(prop) && t.isIdentifier(prop.key) && prop.key.name === 'items'
+            ) as t.ObjectProperty | undefined
+
+            if (itemsProp && t.isArrayExpression(itemsProp.value)) {
+              const topicIndex = itemsProp.value.elements.findIndex(item => {
+                if (!t.isObjectExpression(item)) return false
+
+                const idProp = item.properties.find(
+                  prop =>
+                    t.isObjectProperty(prop) &&
+                    t.isIdentifier(prop.key) &&
+                    prop.key.name === 'id' &&
+                    t.isStringLiteral(prop.value) &&
+                    prop.value.value === topicId
+                )
+                return !!idProp
+              })
+
+              if (topicIndex !== -1) {
+                const topic = itemsProp.value.elements[topicIndex]
+                if (t.isObjectExpression(topic)) {
+                  // Get category id
+                  const catIdProp = element.properties.find(
+                    prop =>
+                      t.isObjectProperty(prop) &&
+                      t.isIdentifier(prop.key) &&
+                      prop.key.name === 'id' &&
+                      t.isStringLiteral(prop.value)
+                  ) as t.ObjectProperty | undefined
+
+                  if (catIdProp && t.isStringLiteral(catIdProp.value)) {
+                    oldCategoryId = catIdProp.value.value
+                  }
+
+                  // Update topic properties
+                  topic.properties.forEach(prop => {
+                    if (!t.isObjectProperty(prop) || !t.isIdentifier(prop.key)) return
+
+                    const key = prop.key.name
+                    if (key === 'categoryId') {
+                      prop.value = t.stringLiteral(newCategoryId)
+                    } else if (key === 'name' && updates.name) {
+                      prop.value = t.stringLiteral(updates.name)
+                    } else if (key === 'slug' && updates.slug) {
+                      prop.value = t.stringLiteral(updates.slug)
+                    } else if (key === 'description' && updates.description !== undefined) {
+                      prop.value = t.stringLiteral(updates.description)
+                    } else if (key === 'image' && updates.image !== undefined) {
+                      prop.value = t.stringLiteral(updates.image)
+                    }
+                  })
+
+                  // If category changed, need to move topic
+                  if (oldCategoryId !== newCategoryId) {
+                    topicToMove = topic
+                    itemsProp.value.elements.splice(topicIndex, 1)
+                  }
+                }
+              }
+            }
+          })
+
+          // Add topic to new category if needed
+          if (topicToMove && oldCategoryId !== newCategoryId) {
+            init.elements.forEach(element => {
+              if (!t.isObjectExpression(element)) return
+
+              const idProp = element.properties.find(
+                prop =>
+                  t.isObjectProperty(prop) &&
+                  t.isIdentifier(prop.key) &&
+                  prop.key.name === 'id' &&
+                  t.isStringLiteral(prop.value) &&
+                  prop.value.value === newCategoryId
+              )
+
+              if (idProp) {
+                const itemsProp = element.properties.find(
+                  prop =>
+                    t.isObjectProperty(prop) &&
+                    t.isIdentifier(prop.key) &&
+                    prop.key.name === 'items'
+                ) as t.ObjectProperty | undefined
+
+                if (itemsProp && t.isArrayExpression(itemsProp.value) && topicToMove) {
+                  itemsProp.value.elements.push(topicToMove)
+                }
+              }
+            })
+          }
+        }
+      }
+    }
+  })
+
+  return await generateCode(ast)
+}
+
+/**
+ * Delete a topic from topics array
+ */
+export async function deleteTopicFromAST(content: string, topicId: string): Promise<string> {
+  const ast = parseConfigFile(content)
+
+  traverse(ast, {
+    ExportNamedDeclaration(path: NodePath<t.ExportNamedDeclaration>) {
+      const declaration = path.node.declaration
+
+      if (
+        t.isVariableDeclaration(declaration) &&
+        declaration.declarations[0] &&
+        t.isVariableDeclarator(declaration.declarations[0]) &&
+        t.isIdentifier(declaration.declarations[0].id) &&
+        declaration.declarations[0].id.name === 'topics'
+      ) {
+        const init = declaration.declarations[0].init
+
+        if (t.isArrayExpression(init)) {
+          init.elements.forEach(element => {
+            if (!t.isObjectExpression(element)) return
+
+            const itemsProp = element.properties.find(
+              prop =>
+                t.isObjectProperty(prop) && t.isIdentifier(prop.key) && prop.key.name === 'items'
+            ) as t.ObjectProperty | undefined
+
+            if (itemsProp && t.isArrayExpression(itemsProp.value)) {
+              itemsProp.value.elements = itemsProp.value.elements.filter(item => {
+                if (!t.isObjectExpression(item)) return true
+
+                const idProp = item.properties.find(
+                  prop =>
+                    t.isObjectProperty(prop) &&
+                    t.isIdentifier(prop.key) &&
+                    prop.key.name === 'slug' &&
+                    t.isStringLiteral(prop.value) &&
+                    prop.value.value === topicId
+                )
+
+                return !idProp
+              })
+            }
+          })
+        }
+      }
+    }
+  })
+
+  return await generateCode(ast)
+}
+
+/**
+ * Update topics order across categories
+ */
+export async function updateTopicsOrderInAST(
+  content: string,
+  topicsOrder: Array<{ categoryId: string; topicIds: string[] }>
+): Promise<string> {
+  const ast = parseConfigFile(content)
+
+  traverse(ast, {
+    ExportNamedDeclaration(path: NodePath<t.ExportNamedDeclaration>) {
+      const declaration = path.node.declaration
+
+      if (
+        t.isVariableDeclaration(declaration) &&
+        declaration.declarations[0] &&
+        t.isVariableDeclarator(declaration.declarations[0]) &&
+        t.isIdentifier(declaration.declarations[0].id) &&
+        declaration.declarations[0].id.name === 'topics'
+      ) {
+        const init = declaration.declarations[0].init
+
+        if (t.isArrayExpression(init)) {
+          // Collect all topics from all categories
+          const allTopicsMap = new Map<string, t.ObjectExpression>()
+
+          init.elements.forEach(element => {
+            if (!t.isObjectExpression(element)) return
+
+            const itemsProp = element.properties.find(
+              prop =>
+                t.isObjectProperty(prop) && t.isIdentifier(prop.key) && prop.key.name === 'items'
+            ) as t.ObjectProperty | undefined
+
+            if (itemsProp && t.isArrayExpression(itemsProp.value)) {
+              itemsProp.value.elements.forEach(item => {
+                if (!t.isObjectExpression(item)) return
+
+                const idProp = item.properties.find(
+                  prop =>
+                    t.isObjectProperty(prop) &&
+                    t.isIdentifier(prop.key) &&
+                    prop.key.name === 'id' &&
+                    t.isStringLiteral(prop.value)
+                ) as t.ObjectProperty | undefined
+
+                if (idProp && t.isStringLiteral(idProp.value)) {
+                  allTopicsMap.set(idProp.value.value, item)
+                }
+              })
+            }
+          })
+
+          // Create map of topicId -> new categoryId
+          const topicCategoryMap = new Map<string, string>()
+          topicsOrder.forEach(({ categoryId, topicIds }) => {
+            topicIds.forEach(topicId => {
+              topicCategoryMap.set(topicId, categoryId)
+            })
+          })
+
+          // First, clear all items arrays
+          init.elements.forEach(element => {
+            if (!t.isObjectExpression(element)) return
+
+            const itemsProp = element.properties.find(
+              prop =>
+                t.isObjectProperty(prop) && t.isIdentifier(prop.key) && prop.key.name === 'items'
+            ) as t.ObjectProperty | undefined
+
+            if (itemsProp && t.isArrayExpression(itemsProp.value)) {
+              itemsProp.value.elements = []
+            }
+          })
+
+          // Then, redistribute topics to correct categories with correct order
+          init.elements.forEach(element => {
+            if (!t.isObjectExpression(element)) return
+
+            const categoryIdProp = element.properties.find(
+              prop =>
+                t.isObjectProperty(prop) &&
+                t.isIdentifier(prop.key) &&
+                prop.key.name === 'id' &&
+                t.isStringLiteral(prop.value)
+            ) as t.ObjectProperty | undefined
+
+            if (!categoryIdProp || !t.isStringLiteral(categoryIdProp.value)) return
+
+            const categoryId = categoryIdProp.value.value
+            const orderInfo = topicsOrder.find(order => order.categoryId === categoryId)
+
+            if (!orderInfo) return
+
+            const itemsProp = element.properties.find(
+              prop =>
+                t.isObjectProperty(prop) && t.isIdentifier(prop.key) && prop.key.name === 'items'
+            ) as t.ObjectProperty | undefined
+
+            if (itemsProp && t.isArrayExpression(itemsProp.value)) {
+              // Add topics in specified order
+              orderInfo.topicIds.forEach(topicId => {
+                const topic = allTopicsMap.get(topicId)
+                if (topic && t.isArrayExpression(itemsProp.value)) {
+                  // Update categoryId in topic to match current category
+                  let categoryIdUpdated = false
+                  topic.properties.forEach(prop => {
+                    if (
+                      t.isObjectProperty(prop) &&
+                      t.isIdentifier(prop.key) &&
+                      prop.key.name === 'categoryId'
+                    ) {
+                      prop.value = t.stringLiteral(categoryId)
+                      categoryIdUpdated = true
+                    }
+                  })
+
+                  // If categoryId property doesn't exist, add it
+                  if (!categoryIdUpdated) {
+                    topic.properties.push(
+                      t.objectProperty(t.identifier('categoryId'), t.stringLiteral(categoryId))
+                    )
+                  }
+
+                  itemsProp.value.elements.push(topic)
+                }
+              })
             }
           })
         }

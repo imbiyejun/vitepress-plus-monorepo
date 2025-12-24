@@ -12,6 +12,7 @@ import {
   getArticlesPath,
   getTopicsConfigPath
 } from '../config/paths.js'
+import { updateTopicInAST, updateTopicsOrderInAST } from '../utils/astHelper.js'
 
 interface TopicMetadata {
   title: string
@@ -224,176 +225,36 @@ export const updateTopicDetail = async (req: Request, res: Response) => {
   try {
     const topicData = req.body
 
-    // 验证必要字段
+    // Validate required fields
     if (!topicData.name || !topicData.slug || !Array.isArray(topicData.chapters)) {
       return sendError(res, '数据格式不正确', 400)
     }
 
-    // 同步更新文档和配置
-    try {
-      // 1. 同步文件系统（创建目录和文件）
-      await syncFileSystem(topicData)
+    // 1. Sync file system (create directories and files)
+    await syncFileSystem(topicData)
 
-      // 2. 更新专题数据
-      await syncTopicData(topicData)
+    // 2. Update topic data file
+    await syncTopicData(topicData)
 
-      // 2. 更新大类配置文件
-      const configPath = join(getTopicsConfigPath(), 'index.ts')
-      const configContent = await fs.readFile(configPath, 'utf-8')
+    // 3. Update topics config file using AST
+    const configPath = join(getTopicsConfigPath(), 'index.ts')
+    const configContent = await fs.readFile(configPath, 'utf-8')
 
-      // 使用正则表达式提取topics数组的内容
-      const match = configContent.match(/export const topics: TopicCategory\[\] = (\[[\s\S]*?\n])/m)
-      if (!match) {
-        throw new Error('无法解析topics配置')
+    const updatedContent = await updateTopicInAST(
+      configContent,
+      topicData.id,
+      topicData.categoryId,
+      {
+        name: topicData.name,
+        slug: topicData.slug,
+        description: topicData.description,
+        image: topicData.image
       }
+    )
 
-      // 将TypeScript代码转换为可执行的JavaScript代码
-      const arrayContent = match[1]
-        .replace(/\n\s*\/\/[^\n]*/g, '') // 移除注释
-        .replace(/\s*,\s*\n\s*]/g, '\n]') // 处理最后一个逗号
+    await fs.writeFile(configPath, updatedContent, 'utf-8')
 
-      // 使用Function构造器创建一个安全的求值环境
-      const fn = new Function(`return ${arrayContent}`)
-      interface TopicItem {
-        id: string
-        categoryId: string
-        name: string
-        slug: string
-        description?: string
-        image?: string
-      }
-
-      interface TopicCategory {
-        id: string
-        items: TopicItem[]
-        [key: string]: unknown
-      }
-
-      const currentTopics = fn() as TopicCategory[]
-
-      // 找到当前专题所在的分类
-      let currentCategory: TopicCategory | null = null
-      let currentTopicIndex = -1
-      for (const category of currentTopics) {
-        const index = category.items.findIndex(item => item.id === topicData.id)
-        if (index !== -1) {
-          currentCategory = category
-          currentTopicIndex = index
-          break
-        }
-      }
-
-      const updatedTopics = [...currentTopics]
-
-      // 如果找到了当前专题
-      if (currentCategory) {
-        // 检查是否需要移动到新的分类
-        if (currentCategory.id !== topicData.categoryId) {
-          // 从原分类中移除
-          currentCategory.items.splice(currentTopicIndex, 1)
-
-          // 添加到新分类
-          const targetCategory = updatedTopics.find(
-            category => category.id === topicData.categoryId
-          )
-          if (!targetCategory) {
-            throw new Error('目标分类不存在')
-          }
-          targetCategory.items.push({
-            id: topicData.id,
-            categoryId: topicData.categoryId,
-            name: topicData.name,
-            slug: topicData.slug,
-            description: topicData.description,
-            image: topicData.image
-          })
-        } else {
-          // 如果分类没变，只更新专题信息
-          currentCategory.items[currentTopicIndex] = {
-            id: topicData.id,
-            categoryId: topicData.categoryId,
-            name: topicData.name,
-            slug: topicData.slug,
-            description: topicData.description,
-            image: topicData.image
-          }
-        }
-      } else {
-        // 专题未在配置中找到，说明是新专题，需要添加到指定分类
-        console.log('专题未在配置中找到，尝试添加到分类:', topicData.categoryId)
-
-        const targetCategory = updatedTopics.find(category => category.id === topicData.categoryId)
-
-        if (!targetCategory) {
-          console.error('目标分类不存在:', topicData.categoryId)
-          console.error(
-            '可用的分类:',
-            updatedTopics.map(c => c.id)
-          )
-          throw new Error('专题未在配置中找到，且目标分类不存在')
-        }
-
-        // 添加新专题到目标分类
-        targetCategory.items.push({
-          id: topicData.id,
-          categoryId: topicData.categoryId,
-          name: topicData.name,
-          slug: topicData.slug,
-          description: topicData.description,
-          image: topicData.image
-        })
-
-        console.log('成功添加新专题到分类')
-      }
-
-      type FormatValue = string | number | boolean | null | FormatObject | FormatArray
-      interface FormatObject {
-        [key: string]: FormatValue
-      }
-      type FormatArray = FormatValue[]
-
-      // 生成新的文件内容
-      const formatObject = (obj: FormatValue | TopicCategory[], indent = 0): string => {
-        if (Array.isArray(obj)) {
-          if (obj.length === 0) return '[]'
-
-          const items = obj.map(
-            item => `${' '.repeat(indent + 2)}${formatObject(item as FormatValue, indent + 2)}`
-          )
-          return `[\n${items.join(',\n')}\n${' '.repeat(indent)}]`
-        }
-
-        if (typeof obj === 'object' && obj !== null) {
-          const entries = Object.entries(obj)
-          if (entries.length === 0) return '{}'
-          const items = entries.map(([key, value]) => {
-            const formattedValue =
-              typeof value === 'string'
-                ? `'${value}'`
-                : formatObject(value as FormatValue, indent + 2)
-            return `${' '.repeat(indent + 2)}${key}: ${formattedValue}`
-          })
-          return `{\n${items.join(',\n')}\n${' '.repeat(indent)}}`
-        }
-
-        return String(obj)
-      }
-
-      const updatedContent = `import { TopicCategory } from './types'
-
-export const topics: TopicCategory[] = ${formatObject(updatedTopics)}
-
-export * from './types'
-`
-
-      // 写入文件
-      await fs.writeFile(configPath, updatedContent, 'utf-8')
-
-      sendSuccess(res, null, '更新成功')
-    } catch (syncError) {
-      console.error('同步专题数据失败:', syncError)
-      sendError(res, syncError instanceof Error ? syncError.message : '同步专题数据失败', 500)
-    }
+    sendSuccess(res, null, '更新成功')
   } catch (error) {
     console.error('更新专题失败:', error)
     sendError(res, error instanceof Error ? error.message : '更新专题失败', 500)
@@ -444,7 +305,7 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
   try {
     const topicsOrder: TopicOrderItem[] = req.body
 
-    // 验证请求数据
+    // Validate request data
     if (
       !Array.isArray(topicsOrder) ||
       topicsOrder.some(item => !item.categoryId || !Array.isArray(item.topicIds))
@@ -452,11 +313,10 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
       return sendError(res, '数据格式不正确', 400)
     }
 
-    // 读取所有专题数据
+    // Load all topic data
     const topics = await fs.readdir(getTopicsDataPath(), { withFileTypes: true })
     const topicDataMap = new Map()
 
-    // 加载所有专题数据
     for (const topic of topics) {
       if (topic.isDirectory() && topic.name !== 'types') {
         try {
@@ -468,140 +328,28 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
       }
     }
 
-    // 更新每个专题的分类
+    // Update categoryId for each topic data file
     for (const { categoryId, topicIds } of topicsOrder) {
       for (const topicId of topicIds) {
         const topicData = topicDataMap.get(topicId)
 
         if (topicData) {
-          // 只更新专题的分类ID
           const updatedTopicData = {
             ...topicData,
             categoryId
           }
 
-          // 同步更新专题数据
           await syncTopicData(updatedTopicData)
         }
       }
     }
 
-    // 更新 topics/config/index.ts 文件
+    // Update topics/config/index.ts file using AST
     const configPath = join(getTopicsConfigPath(), 'index.ts')
     const configContent = await fs.readFile(configPath, 'utf-8')
 
-    // 使用正则表达式提取topics数组的内容
-    const match = configContent.match(/export const topics: TopicCategory\[\] = (\[[\s\S]*?\n])/m)
-    if (!match) {
-      throw new Error('无法解析topics配置')
-    }
+    const updatedContent = await updateTopicsOrderInAST(configContent, topicsOrder)
 
-    // 将TypeScript代码转换为可执行的JavaScript代码
-    const arrayContent = match[1]
-      .replace(/\n\s*\/\/[^\n]*/g, '') // 移除注释
-      .replace(/\s*,\s*\n\s*]/g, '\n]') // 处理最后一个逗号
-
-    // 使用Function构造器创建一个安全的求值环境
-    const fn = new Function(`return ${arrayContent}`)
-
-    // 创建一个映射来存储每个专题应该属于哪个分类
-    const topicCategoryMap = new Map()
-    topicsOrder.forEach(({ categoryId, topicIds }) => {
-      topicIds.forEach(topicId => {
-        topicCategoryMap.set(topicId, categoryId)
-      })
-    })
-
-    const allCurrentTopics = fn() as Array<{
-      id: string
-      items: Array<{
-        id: string
-        categoryId: string
-        [key: string]: unknown
-      }>
-      [key: string]: unknown
-    }>
-
-    // 从所有分类中移除已移动的专题
-    const allTopics = new Map<
-      string,
-      {
-        id: string
-        categoryId: string
-        [key: string]: unknown
-      }
-    >()
-    allCurrentTopics.forEach(category => {
-      category.items.forEach(item => {
-        allTopics.set(item.id, {
-          ...item,
-          categoryId: topicCategoryMap.get(item.id) || item.categoryId
-        })
-      })
-    })
-
-    // 更新专题顺序
-    const updatedTopics = allCurrentTopics.map(category => {
-      const orderInfo = topicsOrder.find(order => order.categoryId === category.id)
-      if (orderInfo) {
-        // 获取属于这个分类的专题
-        const items = orderInfo.topicIds
-          .map(topicId => allTopics.get(topicId))
-          .filter(Boolean)
-          .map(item => ({
-            ...item,
-            categoryId: category.id // 确保categoryId正确
-          }))
-
-        return {
-          ...category,
-          items
-        }
-      } else {
-        // 如果这个分类没有在topicsOrder中，清空其items（因为可能已经被移动到其他分类）
-        return {
-          ...category,
-          items: []
-        }
-      }
-    })
-
-    type FormatValue = string | number | boolean | null | FormatObject | FormatArray
-    interface FormatObject {
-      [key: string]: FormatValue
-    }
-    type FormatArray = FormatValue[]
-
-    // 生成新的文件内容
-    const formatObject = (obj: FormatValue, indent = 0): string => {
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return '[]'
-        const items = obj.map(item => `${' '.repeat(indent + 2)}${formatObject(item, indent + 2)}`)
-        return `[\n${items.join(',\n')}\n${' '.repeat(indent)}]`
-      }
-
-      if (typeof obj === 'object' && obj !== null) {
-        const entries = Object.entries(obj)
-        if (entries.length === 0) return '{}'
-        const items = entries.map(([key, value]) => {
-          const formattedValue =
-            typeof value === 'string' ? `'${value}'` : formatObject(value, indent + 2)
-          return `${' '.repeat(indent + 2)}${key}: ${formattedValue}`
-        })
-        return `{\n${items.join(',\n')}\n${' '.repeat(indent)}}`
-      }
-
-      return String(obj)
-    }
-
-    const updatedContent = `import { TopicCategory } from './types'
-
-export const topics: TopicCategory[] = ${formatObject(updatedTopics)}
-
-export * from './types'
-`
-
-    // 写入文件
     await fs.writeFile(configPath, updatedContent, 'utf-8')
 
     sendSuccess(res, null, '专题顺序更新成功')
