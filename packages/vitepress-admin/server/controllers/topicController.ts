@@ -3,9 +3,9 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 import { acquireLock, releaseLock } from '../utils/file-lock.js'
 import { backupFile, restoreFile } from '../utils/backup.js'
-import matter from 'gray-matter'
 import { syncTopicData, deleteTopicData } from '../services/topic-sync.js'
 import { sendSuccess, sendError } from '../utils/response.js'
+import type { Topic } from '../types/topic.js'
 import {
   getTopicsPath,
   getTopicsDataPath,
@@ -13,23 +13,6 @@ import {
   getTopicsConfigPath
 } from '../config/paths.js'
 import { updateTopicInAST, updateTopicsOrderInAST } from '../utils/astHelper.js'
-
-interface TopicMetadata {
-  title: string
-  description: string
-  layout?: string
-}
-
-// Parse topic content (reserved for future use)
-
-const _parseTopicContent = (content: string): TopicMetadata => {
-  const { data } = matter(content)
-  return {
-    title: data.title || '',
-    description: data.description || '',
-    layout: data.layout
-  }
-}
 
 export const readTopicConfig = async (req: Request, res: Response) => {
   try {
@@ -192,17 +175,33 @@ const ensureDir = async (dir: string) => {
   }
 }
 
-interface Chapter {
-  articles: Array<{ title: string; slug: string }>
+interface Article {
+  id: string
+  title: string
+  slug: string
+  summary?: string
+  status?: string
 }
 
-interface TopicData {
+interface Chapter {
+  id: string
+  title: string
+  description?: string
+  articles: Article[]
+}
+
+interface TopicUpdateData {
+  id: string
   slug: string
+  name: string
+  categoryId: string
+  description?: string
+  image?: string
   chapters: Chapter[]
 }
 
 // 同步文件系统
-const syncFileSystem = async (topicData: TopicData) => {
+const syncFileSystem = async (topicData: TopicUpdateData) => {
   const topicDir = join(getArticlesPath(), topicData.slug)
   await ensureDir(topicDir)
 
@@ -221,20 +220,105 @@ const syncFileSystem = async (topicData: TopicData) => {
   }
 }
 
+// Handle article file operations (rename/delete)
+const handleArticleFileOperations = async (
+  oldTopicData: TopicUpdateData,
+  newTopicData: TopicUpdateData
+) => {
+  const topicSlug = newTopicData.slug
+  const articlesDir = join(getArticlesPath(), topicSlug)
+
+  // Create maps for easy lookup
+  const oldArticlesMap = new Map<string, Article>()
+  const newArticlesMap = new Map<string, Article>()
+
+  oldTopicData.chapters.forEach(chapter => {
+    chapter.articles.forEach(article => {
+      oldArticlesMap.set(article.slug, article)
+    })
+  })
+
+  newTopicData.chapters.forEach(chapter => {
+    chapter.articles.forEach(article => {
+      newArticlesMap.set(article.slug, article)
+    })
+  })
+
+  // Find articles to delete (exist in old but not in new)
+  for (const [oldSlug, oldArticle] of oldArticlesMap) {
+    let foundInNew = false
+    for (const [, newArticle] of newArticlesMap) {
+      if (newArticle.id === oldArticle.id) {
+        foundInNew = true
+        break
+      }
+    }
+
+    if (!foundInNew) {
+      // Delete article file
+      const oldFilePath = join(articlesDir, `${oldSlug}.md`)
+      try {
+        await fs.access(oldFilePath)
+        await fs.unlink(oldFilePath)
+        console.log(`Deleted article file: ${oldFilePath}`)
+      } catch {
+        // File doesn't exist, ignore
+        console.log(`Article file not found, skip deletion: ${oldFilePath}`)
+      }
+    }
+  }
+
+  // Find articles with changed slug (need to rename)
+  for (const [newSlug, newArticle] of newArticlesMap) {
+    for (const [oldSlug, oldArticle] of oldArticlesMap) {
+      if (newArticle.id === oldArticle.id && newSlug !== oldSlug) {
+        // Rename article file
+        const oldFilePath = join(articlesDir, `${oldSlug}.md`)
+        const newFilePath = join(articlesDir, `${newSlug}.md`)
+
+        try {
+          await fs.access(oldFilePath)
+          await fs.rename(oldFilePath, newFilePath)
+          console.log(`Renamed article file: ${oldSlug}.md -> ${newSlug}.md`)
+        } catch {
+          // File doesn't exist, will be created by syncFileSystem
+          console.log(`Article file not found, will create new: ${oldFilePath}`)
+        }
+        break
+      }
+    }
+  }
+}
+
 export const updateTopicDetail = async (req: Request, res: Response) => {
   try {
-    const topicData = req.body
+    const topicData = req.body as TopicUpdateData
 
     // Validate required fields
     if (!topicData.name || !topicData.slug || !Array.isArray(topicData.chapters)) {
       return sendError(res, '数据格式不正确', 400)
     }
 
+    // Load original topic data for comparison
+    let oldTopicData: TopicUpdateData | null = null
+    try {
+      const loadedData = await loadTopicData(topicData.slug)
+      // Convert loaded data to TopicUpdateData format
+      oldTopicData = loadedData as unknown as TopicUpdateData
+    } catch {
+      console.log('Original topic data not found, treating as new topic')
+    }
+
+    // Handle article file operations if old data exists
+    if (oldTopicData) {
+      await handleArticleFileOperations(oldTopicData, topicData)
+    }
+
     // 1. Sync file system (create directories and files)
     await syncFileSystem(topicData)
 
     // 2. Update topic data file
-    await syncTopicData(topicData)
+    await syncTopicData(topicData as unknown as Topic)
 
     // 3. Update topics config file using AST
     const configPath = join(getTopicsConfigPath(), 'index.ts')

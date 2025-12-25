@@ -16,7 +16,7 @@ const generate =
 /**
  * Generate formatted code from AST
  */
-async function generateCode(ast: t.File): Promise<string> {
+async function generateCode(ast: t.File, filepath?: string): Promise<string> {
   const output = generate(
     ast,
     {
@@ -34,11 +34,14 @@ async function generateCode(ast: t.File): Promise<string> {
   const projectRoot = getProjectRoot()
   const prettierConfig = await prettier.resolveConfig(projectRoot)
 
+  // Determine actual filepath for formatting
+  const actualFilepath = filepath || path.join(projectRoot, '.vitepress/topics/config/index.ts')
+
   // Format with prettier using project config
   const formatted = await prettier.format(output.code, {
     ...prettierConfig,
     parser: 'typescript',
-    filepath: path.join(projectRoot, '.vitepress/topics/config/index.ts')
+    filepath: actualFilepath
   })
 
   // Ensure consistent blank lines - simple and reliable approach
@@ -52,12 +55,23 @@ async function generateCode(ast: t.File): Promise<string> {
 
     result.push(line)
 
-    // Ensure blank line between import and export
+    // Ensure blank line between import and export const
     if (
       line.includes('from') &&
       line.trim().startsWith('import') &&
       nextLine &&
       nextLine.trim().startsWith('export const')
+    ) {
+      // Check if next line is already blank
+      if (nextLine.trim() !== '') {
+        result.push('')
+      }
+    }
+    // Ensure blank line between } and export type/export *
+    else if (
+      line.trim() === '}' &&
+      nextLine &&
+      (nextLine.trim().startsWith('export type') || nextLine.trim().startsWith('export *'))
     ) {
       // Check if next line is already blank
       if (nextLine.trim() !== '') {
@@ -617,6 +631,56 @@ export async function deleteTopicFromAST(content: string, topicId: string): Prom
   })
 
   return await generateCode(ast)
+}
+
+/**
+ * Remove topic from topics data index file (topics/data/index.ts)
+ */
+export async function removeTopicFromDataIndexAST(
+  content: string,
+  topicSlug: string
+): Promise<string> {
+  const ast = parseConfigFile(content)
+
+  traverse(ast, {
+    // Remove import statement
+    ImportDeclaration(path: NodePath<t.ImportDeclaration>) {
+      const source = path.node.source.value
+      if (source === `./${topicSlug}`) {
+        path.remove()
+      }
+    },
+    // Remove from topicsData object
+    ExportNamedDeclaration(path: NodePath<t.ExportNamedDeclaration>) {
+      const declaration = path.node.declaration
+
+      if (
+        t.isVariableDeclaration(declaration) &&
+        declaration.declarations[0] &&
+        t.isVariableDeclarator(declaration.declarations[0]) &&
+        t.isIdentifier(declaration.declarations[0].id) &&
+        declaration.declarations[0].id.name === 'topicsData'
+      ) {
+        const init = declaration.declarations[0].init
+
+        if (t.isObjectExpression(init)) {
+          init.properties = init.properties.filter(prop => {
+            if (!t.isObjectProperty(prop)) return true
+
+            // Check if key matches topicSlug
+            if (t.isIdentifier(prop.key) && prop.key.name === topicSlug) {
+              return false
+            }
+
+            return true
+          })
+        }
+      }
+    }
+  })
+
+  const projectRoot = getProjectRoot()
+  return await generateCode(ast, path.join(projectRoot, '.vitepress/topics/data/index.ts'))
 }
 
 /**

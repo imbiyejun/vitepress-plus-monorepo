@@ -3,7 +3,7 @@ import { join } from 'path'
 import matter from 'gray-matter'
 import type { Topic } from '../types/topic.js'
 import { getTopicsPath, getTopicsDataPath, getTopicsConfigPath } from '../config/paths.js'
-import { deleteTopicFromAST } from '../utils/astHelper.js'
+import { deleteTopicFromAST, removeTopicFromDataIndexAST } from '../utils/astHelper.js'
 
 // 日志工具函数
 const log = {
@@ -119,52 +119,14 @@ async function updateMainDataFile(topic: Topic) {
   }
 }
 
-// 删除主数据文件中的专题引用
+// Remove topic from main data index file using AST
 async function removeFromMainDataFile(slug: string) {
   const mainDataPath = join(getTopicsDataDir(), 'index.ts')
 
   try {
-    // 读取现有文件内容
-    let content = await fs.readFile(mainDataPath, 'utf-8')
-
-    // 删除import语句
-    content = content.replace(
-      new RegExp(`import\\s*{\\s*${slug}Topic\\s*}\\s*from\\s*'./${slug}'\\n?`),
-      ''
-    )
-
-    // 删除topicsData中的引用
-    content = content.replace(new RegExp(`\\s*${slug}:\\s*${slug}Topic,?`), '')
-
-    // 修复格式化问题
-    content = content
-      // 确保所有import语句使用正确的格式
-      .replace(/import\s*{([^}]+)}\s*from/g, (_match, imports) => {
-        return `import { ${imports.trim()} } from`
-      })
-      // 修复多余的空行
-      .replace(/\n{3,}/g, '\n\n')
-      // 确保在export语句前有一个空行
-      .replace(/(\w+)\n(export)/, '$1\n\n$2')
-      // 修复topicsData对象的格式
-      .replace(
-        /(export const topicsData: TopicsData =\s*{)([\s\S]*?)(}+)(\s*\n+\s*export)/,
-        (_match, start, objContent, _closeBraces, end) => {
-          // 提取所有有效的属性
-          const props = objContent
-            .split(',')
-            .map((line: string) => line.trim())
-            .filter((line: string) => line && !line.startsWith('}'))
-            .join(',\n  ')
-
-          return `${start}\n  ${props}\n}${end}`
-        }
-      )
-      // 修复可能的多余空行
-      .replace(/\n{3,}/g, '\n\n')
-
-    // 写入文件
-    await fs.writeFile(mainDataPath, content, 'utf-8')
+    const content = await fs.readFile(mainDataPath, 'utf-8')
+    const updatedContent = await removeTopicFromDataIndexAST(content, slug)
+    await fs.writeFile(mainDataPath, updatedContent, 'utf-8')
   } catch (error) {
     console.error('更新主数据文件失败:', error)
     throw error

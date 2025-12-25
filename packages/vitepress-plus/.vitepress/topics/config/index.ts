@@ -38,14 +38,6 @@ export const topics: TopicCategory[] = [
     slug: 'hhh',
     items: [
       {
-        id: 'business',
-        categoryId: 'hhh',
-        name: 'business',
-        slug: 'business',
-        description: 'businessadsfsfsdf',
-        image: ''
-      },
-      {
         id: 'aabb',
         categoryId: 'hhh',
         name: 'aabb',
@@ -68,66 +60,8 @@ export const topics: TopicCategory[] = [
         slug: 'cc',
         description: 'cc333',
         image: ''
-      },
-      {
-        id: 'dd',
-        categoryId: 'hhh',
-        name: 'dd',
-        slug: 'dd',
-        description: 'dd',
-        image: ''
-      },
-      {
-        id: 'gg',
-        categoryId: 'hhh',
-        name: 'gg',
-        slug: 'gg',
-        description: 'gg',
-        image: ''
-      },
-      {
-        id: 'ii',
-        categoryId: 'hhh',
-        name: 'ii',
-        slug: 'ii',
-        description: 'ii3456',
-        image: ''
-      },
-      {
-        id: 'hh',
-        categoryId: 'hhh',
-        name: 'hh',
-        slug: 'hh',
-        description: 'hh',
-        image: ''
-      },
-      {
-        id: 'ee',
-        categoryId: 'hhh',
-        name: 'ee',
-        slug: 'ee',
-        description: 'ee23',
-        image: ''
       }
     ]
-  },
-  {
-    title: 'aa1',
-    id: 'aa1',
-    slug: 'aa1',
-    items: []
-  },
-  {
-    title: 'cc',
-    id: 'cc',
-    slug: 'cc',
-    items: []
-  },
-  {
-    title: 'bb1',
-    id: 'bb',
-    slug: 'bb',
-    items: []
   }
 ]
 

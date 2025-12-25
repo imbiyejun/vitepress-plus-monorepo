@@ -807,10 +807,10 @@ const handleRemoveChapter = (chapter: Chapter) => {
   })
 }
 
-// 删除文章
+// Remove article without confirmation for empty articles
 const handleRemoveArticle = (chapter: Chapter, article: Article) => {
-  // 如果是未命名文章，直接删除
-  if (!article.title || article.title === '未命名文章') {
+  // Remove directly if title and slug are both empty
+  if (!article.title?.trim() && !article.slug?.trim()) {
     const index = chapter.articles.findIndex(a => a.id === article.id)
     if (index > -1) {
       chapter.articles.splice(index, 1)
@@ -819,7 +819,7 @@ const handleRemoveArticle = (chapter: Chapter, article: Article) => {
     return
   }
 
-  // 其他文章需要确认
+  // Confirm for articles with content
   Modal.confirm({
     title: '确认删除',
     content: '确定要删除该文章吗？',
@@ -849,12 +849,10 @@ const handleArticleTitleEdit = (article: Article) => {
   })
 }
 
-// 保存文章标题
+// Save article title without auto-filling default value
 const handleArticleTitleSave = (article: Article) => {
   article.editing = false
-  if (!article.title.trim()) {
-    article.title = '未命名文章'
-  }
+  // Keep empty value, let validation handle it
 }
 
 // 在抽屉中编辑文章标识
@@ -870,13 +868,10 @@ const handleArticleSlugEdit = (article: Article) => {
   })
 }
 
-// 保存文章标识
+// Save article slug without auto-filling default value
 const handleArticleSlugSave = (article: Article) => {
   article.slugEditing = false
-  if (!article.slug?.trim()) {
-    article.slug = '未设置标识'
-  }
-  // 触发校验
+  // Keep empty value, let validation handle it
   const errors = validateArticle(article)
   article.slugError = errors.slugError
 }
