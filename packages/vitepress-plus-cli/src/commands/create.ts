@@ -1,13 +1,20 @@
 import { Command } from 'commander'
-import { existsSync, mkdirSync, readdirSync, copyFileSync } from 'fs'
-import { join, dirname, resolve } from 'path'
+import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'fs'
+import { dirname, resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { copyTemplate } from '../utils/copy-template.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 interface CreateOptions {
   force?: boolean
+}
+
+interface PackageJson {
+  name: string
+  version: string
+  [key: string]: unknown
 }
 
 export function createCommand(): Command {
@@ -35,10 +42,19 @@ export function createCommand(): Command {
           process.exit(1)
         }
         console.log('⚠️  Overwriting existing directory...\n')
+        // Remove existing directory
+        rmSync(targetDir, { recursive: true, force: true })
       }
 
-      // Get template source directory (from vitepress-plus package)
-      const templateDir = resolve(__dirname, '../../../vitepress-plus')
+      // Get template source directory
+      // When published as npm package, template is in the package root
+      // During development (monorepo), it's in the sibling vitepress-plus directory
+      let templateDir = resolve(__dirname, '../../template')
+
+      // Fallback to monorepo structure for development
+      if (!existsSync(templateDir)) {
+        templateDir = resolve(__dirname, '../../../vitepress-plus')
+      }
 
       if (!existsSync(templateDir)) {
         console.error('❌ Error: Template directory not found.')
@@ -48,13 +64,31 @@ export function createCommand(): Command {
 
       // Create target directory
       try {
-        if (!existsSync(targetDir)) {
-          mkdirSync(targetDir, { recursive: true })
-        }
+        mkdirSync(targetDir, { recursive: true })
 
-        // Copy files
-        console.log('📋 Copying files...\n')
-        copyDirectory(templateDir, targetDir)
+        // Copy template files with gitignore support
+        console.log('📋 Copying template files...\n')
+
+        let copiedCount = 0
+        let skippedCount = 0
+
+        copyTemplate({
+          source: templateDir,
+          target: targetDir,
+          onFileCopied: relativePath => {
+            console.log(`  ✓ ${relativePath}`)
+            copiedCount++
+          },
+          onFileSkipped: () => {
+            // Only log skipped files in verbose mode
+            skippedCount++
+          }
+        })
+
+        console.log(`\n📦 Copied ${copiedCount} files (${skippedCount} files ignored)\n`)
+
+        // Update package.json with project name
+        updatePackageJson(targetDir, projectName)
 
         console.log('✅ Project created successfully!\n')
         console.log('Next steps:')
@@ -70,52 +104,43 @@ export function createCommand(): Command {
   return create
 }
 
-// Copy directory recursively, excluding node_modules and .git
-function copyDirectory(src: string, dest: string): void {
-  const excludeDirs = ['node_modules', '.git', 'dist']
+/**
+ * Update package.json with the new project name
+ */
+function updatePackageJson(targetDir: string, projectName: string): void {
+  const packageJsonPath = resolve(targetDir, 'package.json')
 
-  if (!existsSync(dest)) {
-    mkdirSync(dest, { recursive: true })
+  if (!existsSync(packageJsonPath)) {
+    console.warn('⚠️  Warning: package.json not found in template')
+    return
   }
 
-  const entries = readdirSync(src, { withFileTypes: true })
+  try {
+    const content = readFileSync(packageJsonPath, 'utf-8')
+    const packageJson = JSON.parse(content) as PackageJson
 
-  for (const entry of entries) {
-    const srcPath = join(src, entry.name)
-    const destPath = join(dest, entry.name)
+    // Update package name
+    packageJson.name = projectName
+    packageJson.version = '0.1.0'
 
-    // Get relative path from template root
-    const relativePath = srcPath.replace(src, '').replace(/^[\\/]/, '')
+    // Remove private flag if exists
+    delete packageJson['private']
 
-    // Skip excluded directories
-    if (excludeDirs.some(excluded => relativePath.startsWith(excluded))) {
-      continue
-    }
-
-    // Skip .vitepress/cache directory and its contents
-    if (relativePath.includes('.vitepress\\cache') || relativePath.includes('.vitepress/cache')) {
-      continue
-    }
-
-    // Skip .vitepress/dist directory
-    if (relativePath.includes('.vitepress\\dist') || relativePath.includes('.vitepress/dist')) {
-      continue
-    }
-
-    if (entry.isDirectory()) {
-      copyDirectory(srcPath, destPath)
-    } else if (entry.isFile()) {
-      // Skip hidden files except .gitignore, .env.example
-      if (
-        entry.name.startsWith('.') &&
-        entry.name !== '.gitignore' &&
-        entry.name !== '.env.example'
-      ) {
-        continue
+    // Remove workspace dependencies
+    if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
+      const deps = packageJson.dependencies as Record<string, string>
+      for (const [key, value] of Object.entries(deps)) {
+        if (value.startsWith('workspace:')) {
+          // Convert workspace dependency to latest version
+          deps[key] = '^0.1.0'
+        }
       }
-
-      copyFileSync(srcPath, destPath)
-      console.log(`  ✓ ${relativePath}`)
     }
+
+    writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n', 'utf-8')
+
+    console.log('📝 Updated package.json with project name\n')
+  } catch (error) {
+    console.warn('⚠️  Warning: Could not update package.json:', error)
   }
 }

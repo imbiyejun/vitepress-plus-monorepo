@@ -9,20 +9,26 @@
   "files": [
     "dist",
     "bin",
+    "template",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run prepare-template && tsc",
+    "prepare-template": "tsx scripts/prepare-template.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@imbiyejun/vitepress-plus": "workspace:*",
-    "commander": "^11.0.0"
+    "commander": "^11.0.0",
+    "ignore": "^5.3.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "tsx": "^4.20.3",
     "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
