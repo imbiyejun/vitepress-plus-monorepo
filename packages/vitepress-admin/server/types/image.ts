@@ -1,4 +1,5 @@
 import { Request } from 'express'
+import type { DirectoryItem, Breadcrumb, PaginationInfo } from './common.js'
 
 // Qiniu configuration types
 export interface QiniuConfig {
@@ -27,29 +28,8 @@ export interface UploadRequest extends Request {
   }
 }
 
-// Directory item types
-export interface DirectoryItem {
-  name: string
-  type: 'file' | 'directory'
-  path: string
-  createTime?: string
-  modifyTime?: string
-  size?: number
-}
-
-export interface Breadcrumb {
-  name: string
-  path: string
-}
-
-export interface PaginationInfo {
-  current: number
-  pageSize: number
-  total: number
-  hasMore: boolean
-  nextMarker?: string
-  hasPrevious?: boolean
-}
+// Re-export common types for convenience
+export type { DirectoryItem, Breadcrumb, PaginationInfo }
 
 export interface DirectoryContents {
   items: DirectoryItem[]

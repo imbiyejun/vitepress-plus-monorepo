@@ -12,6 +12,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src')
     }
   },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: false, // Don't clean dist folder (server/cli builds are also there)
+    rollupOptions: {
+      output: {
+        // Optimize chunk splitting for better caching
+        manualChunks: {
+          vendor: ['vue', 'vue-router', 'axios'],
+          antd: ['ant-design-vue', '@ant-design/icons-vue'],
+          editor: ['md-editor-v3']
+        }
+      }
+    }
+  },
   server: {
     port: 5173,
     proxy: {

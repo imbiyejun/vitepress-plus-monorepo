@@ -1,34 +1,70 @@
 {
   "name": "@imbiyejun/vitepress-admin",
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "type": "module",
   "description": "Local development tool for managing VitePress Plus projects",
+  "keywords": [
+    "vitepress",
+    "admin",
+    "cms",
+    "markdown",
+    "vue",
+    "blog"
+  ],
+  "author": "imbiyejun",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imbiyejun/vitepress-plus-monorepo",
+    "directory": "packages/vitepress-admin"
+  },
+  "bugs": {
+    "url": "https://github.com/imbiyejun/vitepress-plus-monorepo/issues"
+  },
+  "homepage": "https://github.com/imbiyejun/vitepress-plus-monorepo#readme",
   "bin": {
     "vpa": "./bin/vpa.js"
   },
+  "main": "./dist/server/index.js",
+  "types": "./dist/server/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./config": "./dist/config/index.js"
+    ".": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./config": {
+      "types": "./dist/server/config/imageConfig.d.ts",
+      "import": "./dist/server/config/imageConfig.js"
+    },
+    "./types": {
+      "types": "./dist/server/types/index.d.ts",
+      "import": "./dist/server/types/index.js"
+    }
   },
   "files": [
     "dist",
-    "bin",
-    "server",
-    "README.md",
-    "LICENSE"
+    "bin"
   ],
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon --watch server -e ts --exec \"tsx server/index.ts\"",
     "dev:cli": "tsx cli/index.ts",
-    "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
+    "clean": "tsx -e \"import {rmSync} from 'fs'; rmSync('dist', {recursive: true, force: true})\"",
     "build": "npm run clean && npm run build:client && npm run build:server && npm run build:cli",
     "build:client": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "build:cli": "tsc -p tsconfig.cli.json",
+    "prepublishOnly": "npm run build",
     "type-check": "vue-tsc --noEmit && tsc --project tsconfig.server.json --noEmit && tsc --project tsconfig.cli.json --noEmit",
     "type-check:client": "vue-tsc --noEmit",
     "type-check:server": "tsc --project tsconfig.server.json --noEmit",
     "type-check:cli": "tsc --project tsconfig.cli.json --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",

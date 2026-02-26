@@ -1,0 +1,57 @@
+# Source files
+src/
+server/
+cli/
+scripts/
+
+# Config files
+*.config.ts
+*.config.js
+tsconfig*.json
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Development files
+node_modules/
+.DS_Store
+*.log
+*.local
+
+# Test files
+__tests__/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Documentation (optional, keep if needed)
+docs/
+PUBLISHING.md
+OPTIMIZATION_SUMMARY.md
+QUICK_START.md
+PRE_PUBLISH_CHECKLIST.md
+CHANGELOG.md
+
+# Environment
+.env*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts (keep only dist)
+.turbo/
+coverage/
+
+# Keep these files for npm
+!README.md
+!LICENSE
