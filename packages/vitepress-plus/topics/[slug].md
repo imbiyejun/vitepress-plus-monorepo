@@ -3,6 +3,7 @@ layout: page
 ---
 
 <script setup>
+import { onMounted } from 'vue'
 import TopicDetail from '../.vitepress/components/TopicDetail.vue'
 import { useData } from 'vitepress'
 import { topics } from '../.vitepress/topics/config'
@@ -10,14 +11,15 @@ import { topics } from '../.vitepress/topics/config'
 const { params } = useData()
 const topicId = params.value.slug
 
-// 获取专题信息用于设置页面标题和描述
 const topicInfo = topics
   .flatMap(category => category.items)
   .find(topic => topic.slug === topicId)
 
-if (topicInfo) {
-  document.title = `${topicInfo.name} 专题`
-}
+onMounted(() => {
+  if (topicInfo) {
+    document.title = `${topicInfo.name} 专题`
+  }
+})
 </script>
 
 <div class="topic-page">

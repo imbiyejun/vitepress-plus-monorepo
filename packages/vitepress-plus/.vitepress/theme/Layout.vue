@@ -28,19 +28,9 @@ const themeConfig = computed(() => ({
   }
 }))
 
-// 监听主题变化 - 只在客户端执行
-onMounted(() => {
-  // 初始化主题
-  updateTheme(isDark.value)
-
-  // 监听主题变化
-  watch(isDark, newVal => {
-    updateTheme(newVal)
-  })
-})
-
-// 更新主题的函数
+// Update theme - only runs on client side
 const updateTheme = isDarkMode => {
+  if (typeof document === 'undefined') return
   const html = document.documentElement
   if (isDarkMode) {
     html.setAttribute('data-theme', 'dark')
@@ -48,6 +38,15 @@ const updateTheme = isDarkMode => {
     html.setAttribute('data-theme', 'light')
   }
 }
+
+// Watch theme changes - only on client side
+onMounted(() => {
+  updateTheme(isDark.value)
+
+  watch(isDark, newVal => {
+    updateTheme(newVal)
+  })
+})
 </script>
 
 <style scoped>
