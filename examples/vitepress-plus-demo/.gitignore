@@ -1,0 +1,14 @@
+# VitePress cache and build
+.vitepress/cache
+.vitepress/dist
+
+# Environment
+.env
+.env.local
+
+# Dependencies
+node_modules
+
+# Logs
+*.log
+
