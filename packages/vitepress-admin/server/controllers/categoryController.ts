@@ -46,23 +46,28 @@ interface TopicData {
 const getTopicsConfigFile = () => join(getTopicsConfigPath(), 'index.ts')
 const getTopicsDataDir = () => getTopicsDataPath()
 
-// 从文件中读取topics配置
 const readTopicsConfig = async (): Promise<TopicCategory[]> => {
   try {
-    const content = await fs.readFile(getTopicsConfigFile(), 'utf-8')
+    const configFile = getTopicsConfigFile()
 
-    // 使用正则表达式提取topics数组的内容
-    const match = content.match(/export const topics[^=]+=\s*(\[[\s\S]*?\n])/m)
-    if (!match) {
-      throw new Error('无法解析topics配置')
+    try {
+      await fs.access(configFile)
+    } catch {
+      return []
     }
 
-    // 将TypeScript代码转换为可执行的JavaScript代码
-    const arrayContent = match[1]
-      .replace(/\n\s*\/\/[^\n]*/g, '') // 移除注释
-      .replace(/\s*,\s*\n\s*]/g, '\n]') // 处理最后一个逗号
+    const content = await fs.readFile(configFile, 'utf-8')
 
-    // 使用Function构造器创建一个安全的求值环境
+    // Match both with and without type annotation
+    // export const topics = [...]
+    // export const topics: TopicCategory[] = [...]
+    const match = content.match(/export const topics(?::\s*[^=]+)?\s*=\s*(\[[\s\S]*?\n\])/m)
+    if (!match) {
+      return []
+    }
+
+    const arrayContent = match[1].replace(/\n\s*\/\/[^\n]*/g, '').replace(/\s*,\s*\n\s*]/g, '\n]')
+
     const fn = new Function(`return ${arrayContent}`)
     return fn() as TopicCategory[]
   } catch (error) {
@@ -92,10 +97,8 @@ const loadTopicData = async (slug: string): Promise<TopicData | null> => {
   }
 }
 
-// 获取所有专题大类
-export const getCategories = async (_req: Request, res: Response) => {
+export const getCategories = async (_req: Request, res: Response): Promise<void> => {
   try {
-    // 设置响应头，禁用缓存
     res.set({
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       Pragma: 'no-cache',
@@ -107,7 +110,6 @@ export const getCategories = async (_req: Request, res: Response) => {
       topics.map(async category => {
         const topicsWithArticleCount = await Promise.all(
           category.items.map(async item => {
-            // 尝试加载专题数据以获取文章数量
             const topicData = await loadTopicData(item.slug)
             const articleCount =
               topicData?.chapters?.reduce((total: number, chapter: Chapter) => {
@@ -121,7 +123,7 @@ export const getCategories = async (_req: Request, res: Response) => {
               path: `/topics/${item.slug}`,
               icon: item.image,
               articleCount,
-              categoryId: category.id // 添加 categoryId
+              categoryId: category.id
             }
           })
         )
@@ -129,7 +131,7 @@ export const getCategories = async (_req: Request, res: Response) => {
         return {
           id: category.id,
           name: category.title,
-          slug: category.slug || category.id.toLowerCase().replace(/\s+/g, '-'), // 兼容旧数据
+          slug: category.slug || category.id.toLowerCase().replace(/\s+/g, '-'),
           topics: topicsWithArticleCount
         }
       })
@@ -142,20 +144,17 @@ export const getCategories = async (_req: Request, res: Response) => {
   }
 }
 
-// 添加新的专题大类
-export const addCategory = async (req: Request, res: Response) => {
+export const addCategory = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, slug } = req.body
     if (!title || !slug) {
       return sendError(res, '分类名称和标识不能为空', 400)
     }
 
-    // 验证slug格式
     if (!/^[a-z0-9-]+$/.test(slug)) {
       return sendError(res, '分类标识只能包含小写字母、数字和连字符', 400)
     }
 
-    // 读取当前配置，检查是否已存在相同名称或标识的分类
     const topics = await readTopicsConfig()
     const existingCategory = topics.find(
       category =>
@@ -167,20 +166,35 @@ export const addCategory = async (req: Request, res: Response) => {
       return sendError(res, '专题大类名称或标识已存在，请使用其他名称或标识', 400)
     }
 
-    // Read current config file
-    const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
+    const configFile = getTopicsConfigFile()
 
-    // Use AST to add new category
-    const updatedContent = await addCategoryToAST(fileContent, {
-      title,
-      id: slug,
-      slug
-    })
+    try {
+      await fs.access(configFile)
+      const fileContent = await fs.readFile(configFile, 'utf-8')
+      const updatedContent = await addCategoryToAST(fileContent, {
+        title,
+        id: slug,
+        slug
+      })
+      await fs.writeFile(configFile, updatedContent, 'utf-8')
+    } catch {
+      const defaultContent = `import { TopicCategory } from './types'
 
-    // Write file
-    await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
+export const topics: TopicCategory[] = [
+  {
+    id: '${slug}',
+    title: '${title}',
+    slug: '${slug}',
+    items: []
+  }
+]
+export * from './types'
+`
+      const configDir = join(getTopicsConfigPath())
+      await fs.mkdir(configDir, { recursive: true })
+      await fs.writeFile(configFile, defaultContent, 'utf-8')
+    }
 
-    // 返回与getCategories一致的数据结构
     sendSuccess(
       res,
       {
@@ -197,8 +211,7 @@ export const addCategory = async (req: Request, res: Response) => {
   }
 }
 
-// 更新专题大类
-export const updateCategory = async (req: Request, res: Response) => {
+export const updateCategory = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     const { title, slug } = req.body
@@ -207,24 +220,20 @@ export const updateCategory = async (req: Request, res: Response) => {
       return sendError(res, '分类ID、名称和标识不能为空', 400)
     }
 
-    // 验证slug格式
     if (!/^[a-z0-9-]+$/.test(slug)) {
       return sendError(res, '分类标识只能包含小写字母、数字和连字符', 400)
     }
 
-    // 读取当前配置
     const topics = await readTopicsConfig()
 
-    // 查找要更新的分类
     const categoryToUpdate = topics.find(category => category.id === id)
     if (!categoryToUpdate) {
       return sendError(res, '分类不存在', 404)
     }
 
-    // 检查新的名称或标识是否与其他分类冲突
     const existingCategory = topics.find(
       category =>
-        category.id !== id && // 排除当前分类
+        category.id !== id &&
         (category.title.toLowerCase() === title.toLowerCase() ||
           category.slug?.toLowerCase() === slug.toLowerCase())
     )
@@ -233,16 +242,10 @@ export const updateCategory = async (req: Request, res: Response) => {
       return sendError(res, '专题大类名称或标识已存在，请使用其他名称或标识', 400)
     }
 
-    // Read current config file
     const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
-
-    // Use AST to update category
     const updatedContent = await updateCategoryInAST(fileContent, id, { title, slug })
-
-    // Write config file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
-    // Re-read updated config to get the updated category
     const updatedTopics = await readTopicsConfig()
     const updatedCategory = updatedTopics.find(cat => cat.id === slug)
 
@@ -250,7 +253,6 @@ export const updateCategory = async (req: Request, res: Response) => {
       return sendError(res, '更新后的分类未找到', 500)
     }
 
-    // Update categoryId in topic data files
     await Promise.all(
       updatedCategory.items.map(async topic => {
         const topicDataFile = join(getTopicsDataDir(), topic.slug, 'index.ts')
@@ -267,7 +269,6 @@ export const updateCategory = async (req: Request, res: Response) => {
       })
     )
 
-    // Return updated category data
     sendSuccess(
       res,
       {
@@ -290,34 +291,26 @@ export const updateCategory = async (req: Request, res: Response) => {
   }
 }
 
-export const deleteCategory = async (req: Request, res: Response) => {
+export const deleteCategory = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     if (!id) {
       return sendError(res, '分类ID不能为空', 400)
     }
 
-    // Read current config
     const topics = await readTopicsConfig()
 
-    // Find category to delete
     const categoryToDelete = topics.find(category => category.id === id)
     if (!categoryToDelete) {
       return sendError(res, '分类不存在', 404)
     }
 
-    // 检查分类是否有子专题
     if (categoryToDelete.items && categoryToDelete.items.length > 0) {
       return sendError(res, '该分类下还有专题，无法删除', 400)
     }
 
-    // Read current config file
     const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
-
-    // Use AST to delete category
     const updatedContent = await deleteCategoryFromAST(fileContent, id)
-
-    // Write file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     sendSuccess(res, null, '删除成功')
@@ -327,30 +320,22 @@ export const deleteCategory = async (req: Request, res: Response) => {
   }
 }
 
-export const updateCategoriesOrder = async (req: Request, res: Response) => {
+export const updateCategoriesOrder = async (req: Request, res: Response): Promise<void> => {
   try {
     const { categories } = req.body
     if (!Array.isArray(categories)) {
       return sendError(res, '数据格式不正确', 400)
     }
 
-    // Read current config
     const topics = await readTopicsConfig()
-
-    // Validate all submitted category IDs
     const validIds = new Set(topics.map(t => t.id))
     const allIdsValid = categories.every(id => validIds.has(id))
     if (!allIdsValid) {
       return sendError(res, '存在无效的分类ID', 400)
     }
 
-    // Read current config file
     const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
-
-    // Use AST to reorder categories
     const updatedContent = await reorderCategoriesInAST(fileContent, categories)
-
-    // Write file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
     sendSuccess(res, null, '更新成功')
@@ -360,8 +345,7 @@ export const updateCategoriesOrder = async (req: Request, res: Response) => {
   }
 }
 
-// 添加新的专题
-export const addTopic = async (req: Request, res: Response) => {
+export const addTopic = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, categoryId, description, image, slug } = req.body
 
@@ -369,22 +353,18 @@ export const addTopic = async (req: Request, res: Response) => {
       return sendError(res, '专题名称、所属大类和专题标识不能为空', 400)
     }
 
-    // 读取当前配置
     const topics = await readTopicsConfig()
 
-    // 查找指定的分类
     const category = topics.find(cat => cat.id === categoryId)
     if (!category) {
       return sendError(res, '指定的分类不存在', 404)
     }
 
-    // 检查slug是否已存在
     const existingTopic = category.items.find(item => item.slug === slug)
     if (existingTopic) {
       return sendError(res, '专题标识已存在，请使用其他标识', 400)
     }
 
-    // Create new topic object
     const newTopic: TopicItem = {
       id: slug,
       categoryId: categoryId,
@@ -394,22 +374,13 @@ export const addTopic = async (req: Request, res: Response) => {
       image: image || ''
     }
 
-    // Read current config file
     const fileContent = await fs.readFile(getTopicsConfigFile(), 'utf-8')
-
-    // Use AST to add topic to category
     const updatedContent = await addTopicToAST(fileContent, categoryId, newTopic)
-
-    // Write config file
     await fs.writeFile(getTopicsConfigFile(), updatedContent, 'utf-8')
 
-    // 生成专题数据文件
     await generateTopicDataFile(newTopic)
-
-    // 更新topics数据索引文件
     await updateTopicsDataIndex(newTopic.slug)
 
-    // 返回新创建的专题数据
     sendSuccess(
       res,
       {

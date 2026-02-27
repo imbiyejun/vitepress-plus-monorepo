@@ -48,7 +48,16 @@
     <div :class="['topic-content', { 'content-expanded': collapsed }]">
       <TopicEdit v-if="route.query.topic" />
       <div v-else class="empty-state">
-        <p>请选择一个专题进行编辑</p>
+        <a-empty v-if="categories.length === 0" description="暂无专题大类，请先添加大类">
+          <a-button type="primary" @click="showAddCategory"> <PlusOutlined />添加大类 </a-button>
+        </a-empty>
+        <a-empty
+          v-else-if="!selectedCategory || selectedCategory.topics.length === 0"
+          description="当前大类下暂无专题，请先添加专题"
+        >
+          <a-button type="primary" @click="showAddTopicModal"> <PlusOutlined />添加专题 </a-button>
+        </a-empty>
+        <p v-else>请选择一个专题进行编辑</p>
       </div>
     </div>
 
@@ -197,8 +206,11 @@ watch(editModalVisible, newValue => {
   }
 })
 
-// 显示添加专题弹窗
 const showAddTopicModal = () => {
+  if (categories.value.length === 0) {
+    message.warning('请先添加专题大类')
+    return
+  }
   addTopicVisible.value = true
 }
 
@@ -575,48 +587,40 @@ const handleDeleteCategory = (category: Category) => {
   })
 }
 
-// 修改 onMounted 中的初始化逻辑
 onMounted(async () => {
-  // 加载所有分类和专题数据
   await loadTopics()
 
-  // 获取当前的查询参数
+  // No categories available
+  if (categories.value.length === 0) {
+    return
+  }
+
   const categorySlug = route.query.category as string
   const topicSlug = route.query.topic as string
 
-  // 如果 URL 中有分类参数
   if (categorySlug) {
     const category = categories.value.find(c => c.slug === categorySlug)
     if (category) {
-      // 选中对应的分类
       await selectCategory(category.id)
 
-      // 如果 URL 中有专题参数
       if (topicSlug) {
         const topic = category.topics.find(t => t.id === topicSlug)
         if (topic) {
-          // 选中对应的专题
           await selectTopic(topic.id)
+        } else if (category.topics.length > 0) {
+          const firstTopic = category.topics[0]
+          await selectTopic(firstTopic.id)
+          await router.replace({
+            path: '/topics',
+            query: { category: categorySlug, topic: firstTopic.id }
+          })
         } else {
-          // 如果找不到对应的专题，但该分类下有其他专题
-          if (category.topics.length > 0) {
-            const firstTopic = category.topics[0]
-            await selectTopic(firstTopic.id)
-            // 更新 URL 到第一个专题
-            await router.replace({
-              path: '/topics',
-              query: { category: categorySlug, topic: firstTopic.id }
-            })
-          } else {
-            // 该分类下没有专题，清除专题参数
-            await router.replace({
-              path: '/topics',
-              query: { category: categorySlug }
-            })
-          }
+          await router.replace({
+            path: '/topics',
+            query: { category: categorySlug }
+          })
         }
       } else if (category.topics.length > 0) {
-        // 没有专题参数但分类下有专题，选中第一个专题
         const firstTopic = category.topics[0]
         await selectTopic(firstTopic.id)
         await router.replace({
@@ -625,28 +629,6 @@ onMounted(async () => {
         })
       }
     } else {
-      // 找不到对应的分类，重定向到第一个分类
-      if (categories.value.length > 0) {
-        const firstCategory = categories.value[0]
-        await selectCategory(firstCategory.id)
-        if (firstCategory.topics.length > 0) {
-          const firstTopic = firstCategory.topics[0]
-          await selectTopic(firstTopic.id)
-          await router.replace({
-            path: '/topics',
-            query: { category: firstCategory.slug, topic: firstTopic.id }
-          })
-        } else {
-          await router.replace({
-            path: '/topics',
-            query: { category: firstCategory.slug }
-          })
-        }
-      }
-    }
-  } else {
-    // URL 中没有分类参数，默认选择第一个分类
-    if (categories.value.length > 0) {
       const firstCategory = categories.value[0]
       await selectCategory(firstCategory.id)
       if (firstCategory.topics.length > 0) {
@@ -662,6 +644,22 @@ onMounted(async () => {
           query: { category: firstCategory.slug }
         })
       }
+    }
+  } else {
+    const firstCategory = categories.value[0]
+    await selectCategory(firstCategory.id)
+    if (firstCategory.topics.length > 0) {
+      const firstTopic = firstCategory.topics[0]
+      await selectTopic(firstTopic.id)
+      await router.replace({
+        path: '/topics',
+        query: { category: firstCategory.slug, topic: firstTopic.id }
+      })
+    } else {
+      await router.replace({
+        path: '/topics',
+        query: { category: firstCategory.slug }
+      })
     }
   }
 })

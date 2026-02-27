@@ -32,7 +32,12 @@
     <div :class="['article-content', { 'content-expanded': collapsed }]">
       <ArticleList v-if="route.query.topic" />
       <div v-else class="empty-state">
-        <a-empty description="请选择一个专题查看文章列表" />
+        <a-empty v-if="categories.length === 0" description="暂无专题大类，请前往专题管理添加" />
+        <a-empty
+          v-else-if="!currentTopics || currentTopics.length === 0"
+          description="当前大类下暂无专题，请前往专题管理添加"
+        />
+        <a-empty v-else description="请选择一个专题查看文章列表" />
       </div>
     </div>
   </div>
@@ -93,9 +98,13 @@ const handleTopicSelect = async (topicId: string) => {
   })
 }
 
-// Initialize on mount
 onMounted(async () => {
   await loadTopics()
+
+  // No categories available
+  if (categories.value.length === 0) {
+    return
+  }
 
   const categorySlug = route.query.category as string
   const topicSlug = route.query.topic as string

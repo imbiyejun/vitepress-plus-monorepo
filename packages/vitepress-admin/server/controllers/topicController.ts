@@ -14,7 +14,7 @@ import {
 } from '../config/paths.js'
 import { updateTopicInAST, updateTopicsOrderInAST } from '../utils/astHelper.js'
 
-export const readTopicConfig = async (req: Request, res: Response) => {
+export const readTopicConfig = async (req: Request, res: Response): Promise<void> => {
   try {
     const { filename } = req.params
     const filePath = join(getTopicsPath(), filename)
@@ -27,7 +27,7 @@ export const readTopicConfig = async (req: Request, res: Response) => {
   }
 }
 
-export const updateTopicConfig = async (req: Request, res: Response) => {
+export const updateTopicConfig = async (req: Request, res: Response): Promise<void> => {
   const { filename } = req.params
   const { content } = req.body
   const filePath = join(getTopicsPath(), filename)
@@ -45,26 +45,20 @@ export const updateTopicConfig = async (req: Request, res: Response) => {
   }
 }
 
-// 动态读取专题数据
-const loadTopicData = async (slug: string) => {
+const loadTopicData = async (slug: string): Promise<Record<string, unknown> | null> => {
   try {
     const filePath = join(getTopicsDataPath(), slug, 'index.ts')
     const fileContent = await fs.readFile(filePath, 'utf-8')
 
-    // 使用正则表达式提取 Topic 对象
     const match = fileContent.match(/export const \w+Topic: Topic = ({[\s\S]+})/m)
     if (!match) {
       throw new Error('无法解析专题数据')
     }
 
-    // 将 TypeScript 对象字符串转换为 JavaScript 对象
-    const objectStr = match[1]
-      .replace(/\n\s*\/\/[^\n]*/g, '') // 移除注释
-      .replace(/,(\s*[}\]])/g, '$1') // 移除尾随逗号
+    const objectStr = match[1].replace(/\n\s*\/\/[^\n]*/g, '').replace(/,(\s*[}\]])/g, '$1')
 
-    // 使用 Function 构造器创建一个安全的求值环境
     const fn = new Function(`return ${objectStr}`)
-    return fn()
+    return fn() as Record<string, unknown>
   } catch (error) {
     console.error('读取专题数据失败:', error)
     throw error
@@ -80,9 +74,8 @@ interface TopicListItem {
   articleCount: number
 }
 
-export const listTopics = async (_req: Request, res: Response) => {
+export const listTopics = async (_req: Request, res: Response): Promise<void> => {
   try {
-    // 读取专题数据目录下的所有文件夹
     const topics = await fs.readdir(getTopicsDataPath(), { withFileTypes: true })
     const topicData: TopicListItem[] = []
 
@@ -94,16 +87,18 @@ export const listTopics = async (_req: Request, res: Response) => {
       if (topic.isDirectory() && topic.name !== 'types') {
         try {
           const data = await loadTopicData(topic.name)
-          const articles = (data.chapters as Chapter[]).flatMap(chapter => chapter.articles)
+          if (data) {
+            const articles = (data.chapters as Chapter[]).flatMap(chapter => chapter.articles)
 
-          topicData.push({
-            id: data.slug,
-            title: data.name,
-            description: data.description,
-            path: `${data.slug}.md`,
-            icon: data.image,
-            articleCount: articles.length
-          })
+            topicData.push({
+              id: data.slug as string,
+              title: data.name as string,
+              description: data.description as string,
+              path: `${data.slug}.md`,
+              icon: data.image as string,
+              articleCount: articles.length
+            })
+          }
         } catch (error) {
           console.error(`加载专题 ${topic.name} 失败:`, error)
         }
@@ -117,7 +112,7 @@ export const listTopics = async (_req: Request, res: Response) => {
   }
 }
 
-export const restoreTopicConfig = async (req: Request, res: Response) => {
+export const restoreTopicConfig = async (req: Request, res: Response): Promise<void> => {
   const { filename } = req.params
   const filePath = join(getTopicsPath(), filename)
 
@@ -129,7 +124,7 @@ export const restoreTopicConfig = async (req: Request, res: Response) => {
   }
 }
 
-export const getTopicDetail = async (req: Request, res: Response) => {
+export const getTopicDetail = async (req: Request, res: Response): Promise<void> => {
   try {
     const { slug } = req.params
     const topic = await loadTopicData(slug)
@@ -138,7 +133,6 @@ export const getTopicDetail = async (req: Request, res: Response) => {
       return sendError(res, '专题不存在', 404)
     }
 
-    // 直接返回原始数据，保持字段名一致
     sendSuccess(res, {
       id: topic.id,
       categoryId: topic.categoryId,
@@ -154,7 +148,6 @@ export const getTopicDetail = async (req: Request, res: Response) => {
   }
 }
 
-// 创建文章的默认内容
 const createDefaultArticleContent = (title: string): string => {
   return `---
 title: ${title}
@@ -166,8 +159,7 @@ description:
 `
 }
 
-// 确保目录存在
-const ensureDir = async (dir: string) => {
+const ensureDir = async (dir: string): Promise<void> => {
   try {
     await fs.access(dir)
   } catch {
@@ -200,19 +192,16 @@ interface TopicUpdateData {
   chapters: Chapter[]
 }
 
-// 同步文件系统
-const syncFileSystem = async (topicData: TopicUpdateData) => {
+const syncFileSystem = async (topicData: TopicUpdateData): Promise<void> => {
   const topicDir = join(getArticlesPath(), topicData.slug)
   await ensureDir(topicDir)
 
-  // 创建新文章文件
   for (const chapter of topicData.chapters) {
     for (const article of chapter.articles) {
       const articlePath = join(topicDir, `${article.slug}.md`)
       try {
         await fs.access(articlePath)
       } catch {
-        // 文件不存在，创建新文件
         await fs.writeFile(articlePath, createDefaultArticleContent(article.title), 'utf-8')
         console.log(`Created new article file: ${articlePath}`)
       }
@@ -220,15 +209,13 @@ const syncFileSystem = async (topicData: TopicUpdateData) => {
   }
 }
 
-// Handle article file operations (rename/delete)
 const handleArticleFileOperations = async (
   oldTopicData: TopicUpdateData,
   newTopicData: TopicUpdateData
-) => {
+): Promise<void> => {
   const topicSlug = newTopicData.slug
   const articlesDir = join(getArticlesPath(), topicSlug)
 
-  // Create maps for easy lookup
   const oldArticlesMap = new Map<string, Article>()
   const newArticlesMap = new Map<string, Article>()
 
@@ -244,7 +231,6 @@ const handleArticleFileOperations = async (
     })
   })
 
-  // Find articles to delete (exist in old but not in new)
   for (const [oldSlug, oldArticle] of oldArticlesMap) {
     let foundInNew = false
     for (const [, newArticle] of newArticlesMap) {
@@ -255,24 +241,20 @@ const handleArticleFileOperations = async (
     }
 
     if (!foundInNew) {
-      // Delete article file
       const oldFilePath = join(articlesDir, `${oldSlug}.md`)
       try {
         await fs.access(oldFilePath)
         await fs.unlink(oldFilePath)
         console.log(`Deleted article file: ${oldFilePath}`)
       } catch {
-        // File doesn't exist, ignore
         console.log(`Article file not found, skip deletion: ${oldFilePath}`)
       }
     }
   }
 
-  // Find articles with changed slug (need to rename)
   for (const [newSlug, newArticle] of newArticlesMap) {
     for (const [oldSlug, oldArticle] of oldArticlesMap) {
       if (newArticle.id === oldArticle.id && newSlug !== oldSlug) {
-        // Rename article file
         const oldFilePath = join(articlesDir, `${oldSlug}.md`)
         const newFilePath = join(articlesDir, `${newSlug}.md`)
 
@@ -281,7 +263,6 @@ const handleArticleFileOperations = async (
           await fs.rename(oldFilePath, newFilePath)
           console.log(`Renamed article file: ${oldSlug}.md -> ${newSlug}.md`)
         } catch {
-          // File doesn't exist, will be created by syncFileSystem
           console.log(`Article file not found, will create new: ${oldFilePath}`)
         }
         break
@@ -290,37 +271,29 @@ const handleArticleFileOperations = async (
   }
 }
 
-export const updateTopicDetail = async (req: Request, res: Response) => {
+export const updateTopicDetail = async (req: Request, res: Response): Promise<void> => {
   try {
     const topicData = req.body as TopicUpdateData
 
-    // Validate required fields
     if (!topicData.name || !topicData.slug || !Array.isArray(topicData.chapters)) {
       return sendError(res, '数据格式不正确', 400)
     }
 
-    // Load original topic data for comparison
     let oldTopicData: TopicUpdateData | null = null
     try {
       const loadedData = await loadTopicData(topicData.slug)
-      // Convert loaded data to TopicUpdateData format
       oldTopicData = loadedData as unknown as TopicUpdateData
     } catch {
       console.log('Original topic data not found, treating as new topic')
     }
 
-    // Handle article file operations if old data exists
     if (oldTopicData) {
       await handleArticleFileOperations(oldTopicData, topicData)
     }
 
-    // 1. Sync file system (create directories and files)
     await syncFileSystem(topicData)
-
-    // 2. Update topic data file
     await syncTopicData(topicData as unknown as Topic)
 
-    // 3. Update topics config file using AST
     const configPath = join(getTopicsConfigPath(), 'index.ts')
     const configContent = await fs.readFile(configPath, 'utf-8')
 
@@ -345,18 +318,16 @@ export const updateTopicDetail = async (req: Request, res: Response) => {
   }
 }
 
-export const deleteTopic = async (req: Request, res: Response) => {
+export const deleteTopic = async (req: Request, res: Response): Promise<void> => {
   try {
     const { slug } = req.params
 
-    // 加载专题数据以检查是否有文章
     const topic = await loadTopicData(slug)
 
     if (!topic) {
       return sendError(res, '专题不存在', 404)
     }
 
-    // 检查专题是否有文章
     interface ChapterWithArticles {
       articles: unknown[]
     }
@@ -371,7 +342,6 @@ export const deleteTopic = async (req: Request, res: Response) => {
       return sendError(res, `无法删除专题，该专题下还有 ${totalArticles} 篇文章`, 400)
     }
 
-    // 使用topic-sync服务删除专题数据
     await deleteTopicData(slug)
     sendSuccess(res, null, '删除专题成功')
   } catch (error) {
@@ -385,11 +355,10 @@ interface TopicOrderItem {
   topicIds: string[]
 }
 
-export const updateTopicsOrder = async (req: Request, res: Response) => {
+export const updateTopicsOrder = async (req: Request, res: Response): Promise<void> => {
   try {
     const topicsOrder: TopicOrderItem[] = req.body
 
-    // Validate request data
     if (
       !Array.isArray(topicsOrder) ||
       topicsOrder.some(item => !item.categoryId || !Array.isArray(item.topicIds))
@@ -397,7 +366,6 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
       return sendError(res, '数据格式不正确', 400)
     }
 
-    // Load all topic data
     const topics = await fs.readdir(getTopicsDataPath(), { withFileTypes: true })
     const topicDataMap = new Map()
 
@@ -405,14 +373,15 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
       if (topic.isDirectory() && topic.name !== 'types') {
         try {
           const data = await loadTopicData(topic.name)
-          topicDataMap.set(data.slug, data)
+          if (data) {
+            topicDataMap.set(data.slug, data)
+          }
         } catch (error) {
           console.error(`加载专题 ${topic.name} 失败:`, error)
         }
       }
     }
 
-    // Update categoryId for each topic data file
     for (const { categoryId, topicIds } of topicsOrder) {
       for (const topicId of topicIds) {
         const topicData = topicDataMap.get(topicId)
@@ -428,7 +397,6 @@ export const updateTopicsOrder = async (req: Request, res: Response) => {
       }
     }
 
-    // Update topics/config/index.ts file using AST
     const configPath = join(getTopicsConfigPath(), 'index.ts')
     const configContent = await fs.readFile(configPath, 'utf-8')
 

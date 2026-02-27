@@ -5,10 +5,9 @@ import { sendSuccess, sendError } from '../utils/response.js'
 import { loadTopicsData } from '../utils/data-loader.js'
 import { getArticlesPath } from '../config/paths.js'
 
-export const getTopicArticleList = async (req: Request, res: Response) => {
+export const getTopicArticleList = async (req: Request, res: Response): Promise<void> => {
   const { topicId } = req.params
   try {
-    // Dynamically load topics data from target project
     const topicsData = await loadTopicsData()
     const topicData = topicsData[topicId]
 
@@ -43,21 +42,18 @@ export const getTopicArticleList = async (req: Request, res: Response) => {
   }
 }
 
-// Get article content
-export const getArticleContent = async (req: Request, res: Response) => {
+export const getArticleContent = async (req: Request, res: Response): Promise<void> => {
   const { topicSlug, articleSlug } = req.params
 
   try {
     const articlesDir = getArticlesPath()
     const articlePath = join(articlesDir, topicSlug, `${articleSlug}.md`)
 
-    // Check if file exists, if not create default content
     let content = ''
     try {
       await fs.access(articlePath)
       content = await fs.readFile(articlePath, 'utf-8')
     } catch {
-      // File doesn't exist, create default content
       const defaultContent = `---
 title: ${articleSlug}
 description: 
@@ -66,7 +62,6 @@ description:
 # ${articleSlug}
 
 `
-      // Ensure directory exists
       const articlesDir = getArticlesPath()
       const topicDir = join(articlesDir, topicSlug)
       try {
@@ -75,7 +70,6 @@ description:
         await fs.mkdir(topicDir, { recursive: true })
       }
 
-      // Create file with default content
       await fs.writeFile(articlePath, defaultContent, 'utf-8')
       content = defaultContent
     }
@@ -90,8 +84,7 @@ description:
   }
 }
 
-// Update article content
-export const updateArticleContent = async (req: Request, res: Response) => {
+export const updateArticleContent = async (req: Request, res: Response): Promise<void> => {
   const { topicSlug, articleSlug } = req.params
   const { content } = req.body
 
@@ -103,7 +96,6 @@ export const updateArticleContent = async (req: Request, res: Response) => {
     const articlesDir = getArticlesPath()
     const articlePath = join(articlesDir, topicSlug, `${articleSlug}.md`)
 
-    // Ensure directory exists
     const topicDir = join(articlesDir, topicSlug)
     try {
       await fs.access(topicDir)
@@ -111,7 +103,6 @@ export const updateArticleContent = async (req: Request, res: Response) => {
       await fs.mkdir(topicDir, { recursive: true })
     }
 
-    // Write content to file (create or update)
     await fs.writeFile(articlePath, content, 'utf-8')
 
     sendSuccess(
