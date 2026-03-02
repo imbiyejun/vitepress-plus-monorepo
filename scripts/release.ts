@@ -187,7 +187,7 @@ async function commitAndPush(version: string): Promise<void> {
 
   if (status) {
     await runIfNotDry('git', ['add', '-A'])
-    await runIfNotDry('git', ['commit', '-m', `release: v${version}`])
+    await runIfNotDry('git', ['commit', '-m', `"release: v${version}"`])
 
     const { stdout: branch } = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'])
     step(`Pushing to ${branch.trim()}...`)
