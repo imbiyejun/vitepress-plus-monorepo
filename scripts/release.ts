@@ -314,16 +314,16 @@ async function main(): Promise<void> {
   step('\nUpdating lockfile...')
   await run('pnpm', ['install', '--prefer-offline'])
 
-  // 4. Commit and push changes
+  // 4. Build packages
+  await buildPackages(packages)
+
+  // 5. Publish packages
+  await publishPackages(packages, targetVersion)
+
+  // 6. Commit and push changes (after build to include any generated files)
   if (!skipGit) {
     await commitAndPush(targetVersion)
   }
-
-  // 5. Build packages
-  await buildPackages(packages)
-
-  // 6. Publish packages
-  await publishPackages(packages, targetVersion)
 
   // 7. Create and push tag
   if (!skipGit) {
