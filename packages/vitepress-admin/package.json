@@ -1,6 +1,6 @@
 {
   "name": "@imbiyejun/vitepress-admin",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "type": "module",
   "description": "Local development tool for managing VitePress Plus projects",
   "keywords": [
