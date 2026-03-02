@@ -18,6 +18,7 @@
     "prepare": "husky",
     "release": "tsx scripts/release.ts",
     "release:rc": "tsx scripts/release.ts --type rc",
+    "release:rc:next": "tsx scripts/release.ts --type rc --bump next",
     "release:rc:patch": "tsx scripts/release.ts --type rc --bump patch",
     "release:rc:minor": "tsx scripts/release.ts --type rc --bump minor",
     "release:rc:major": "tsx scripts/release.ts --type rc --bump major",

@@ -39,7 +39,7 @@ const { values: args } = parseArgs({
       short: 't',
       default: 'rc'
     },
-    // patch | minor | major
+    // patch | minor | major | next (next only for RC)
     bump: {
       type: 'string',
       short: 'b',
@@ -69,7 +69,7 @@ const skipGit = args.skipGit
 const skipBuild = args.skipBuild
 const skipPrompts = args.skipPrompts
 const releaseType = args.type as 'rc' | 'release'
-const bumpType = args.bump as 'patch' | 'minor' | 'major'
+const bumpType = args.bump as 'patch' | 'minor' | 'major' | 'next'
 
 let versionUpdated = false
 
@@ -120,33 +120,36 @@ function getBaseVersion(): string {
 
 function calculateNextVersion(
   currentVersion: string,
-  bump: 'patch' | 'minor' | 'major',
+  bump: 'patch' | 'minor' | 'major' | 'next',
   isRC: boolean
 ): string {
-  // Parse current version to get the base version (without prerelease)
   const parsed = semver.parse(currentVersion)
   if (!parsed) {
     throw new Error(`Invalid version: ${currentVersion}`)
   }
 
-  // Get base version without prerelease
   const baseVersion = `${parsed.major}.${parsed.minor}.${parsed.patch}`
   const currentPrerelease = parsed.prerelease
+  const isCurrentRC = currentPrerelease.length > 0 && currentPrerelease[0] === 'rc'
 
   if (isRC) {
-    // RC version logic
-    if (currentPrerelease.length > 0 && currentPrerelease[0] === 'rc') {
-      // Already an RC version, increment RC number
+    if (bump === 'next') {
+      // Increment RC number only (e.g., 0.1.0-rc.3 -> 0.1.0-rc.4)
+      if (!isCurrentRC) {
+        throw new Error('Cannot use "next" bump when current version is not an RC version')
+      }
       const rcNum = typeof currentPrerelease[1] === 'number' ? currentPrerelease[1] : 0
       return `${baseVersion}-rc.${rcNum + 1}`
-    } else {
-      // Not an RC version, bump base version and start RC.1
-      const nextBase = semver.inc(baseVersion, bump)
-      return `${nextBase}-rc.1`
     }
+    // Bump base version first, then add -rc.1
+    const nextBase = semver.inc(baseVersion, bump) as string
+    return `${nextBase}-rc.1`
   } else {
     // Production version logic
-    if (currentPrerelease.length > 0) {
+    if (bump === 'next') {
+      throw new Error('"next" bump is only available for RC releases')
+    }
+    if (isCurrentRC) {
       // Currently RC, release as stable (remove prerelease)
       return baseVersion
     } else {
@@ -202,11 +205,27 @@ async function createAndPushTag(version: string): Promise<void> {
   await runIfNotDry('git', ['push', 'origin', `v${version}`])
 }
 
+async function cleanPackages(packages: PackageInfo[]): Promise<void> {
+  step('\nCleaning packages...')
+
+  for (const pkg of packages) {
+    if (pkg.shouldPublish) {
+      const distPath = path.resolve(pkg.dir, 'dist')
+      if (fs.existsSync(distPath)) {
+        step(`Cleaning ${pkg.name}/dist...`)
+        fs.rmSync(distPath, { recursive: true, force: true })
+      }
+    }
+  }
+}
+
 async function buildPackages(packages: PackageInfo[]): Promise<void> {
   if (skipBuild) {
     step('\nSkipping build...')
     return
   }
+
+  await cleanPackages(packages)
 
   step('\nBuilding packages...')
 
