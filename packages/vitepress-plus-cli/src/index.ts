@@ -1,14 +1,14 @@
 import { Command } from 'commander'
-import { createCommand } from './commands/create.js'
+import { initCommand } from './commands/init.js'
 import { fileURLToPath } from 'url'
 
 export function createCLI(): Command {
   const program = new Command()
 
-  program.name('vp-plus').description('VitePress Plus scaffolding tool').version('0.1.0')
+  program.name('vpp').description('VitePress Plus scaffolding tool').version('0.1.0')
 
   // Register commands
-  program.addCommand(createCommand())
+  program.addCommand(initCommand())
 
   return program
 }
