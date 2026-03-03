@@ -285,11 +285,11 @@ async function main(): Promise<void> {
   step(`\nTarget version: ${pico.bold(pico.green(targetVersion))}`)
 
   if (!skipPrompts) {
-    const { yes: confirmRelease } = await enquirer.prompt<{ yes: boolean }>({
+    const { yes: confirmRelease } = (await enquirer.prompt({
       type: 'confirm',
       name: 'yes',
       message: `Release v${targetVersion}?`
-    })
+    })) as { yes: boolean }
 
     if (!confirmRelease) {
       console.log('Release cancelled.')
