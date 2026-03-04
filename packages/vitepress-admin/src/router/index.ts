@@ -81,6 +81,15 @@ const router = createRouter({
               }
             }
           ]
+        },
+        {
+          path: 'deploy',
+          name: 'deploy',
+          component: () => import('../views/deploy/DeployManager.vue'),
+          meta: {
+            title: '一键部署',
+            icon: 'CloudUploadOutlined'
+          }
         }
       ]
     },

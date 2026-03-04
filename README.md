@@ -24,3 +24,9 @@ alpha 内部测试版 功能不完善，bug 多，仅内部 / 少量用户测试
 beta 公开测试版 功能基本完成，面向用户征集反馈
 rc 发布候选版 功能冻结，仅修 bug，接近正式版
 无标识 正式版（GA/Release） 稳定可用，面向所有用户发布
+
+DEPLOY_HOST=your_server_ip
+DEPLOY_PORT=22
+DEPLOY_USERNAME=your_username
+DEPLOY_PASSWORD=your_password
+DEPLOY_REMOTE_PATH=/var/www/html

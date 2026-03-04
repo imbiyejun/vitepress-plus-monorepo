@@ -129,6 +129,54 @@ export interface ImageConfig {
   qiniuStorage: QiniuConfig
 }
 
+// Deploy types
+export interface DeployStatus {
+  configured: boolean
+  host?: string
+  remotePath?: string
+}
+
+export type DeployStepStatus = 'pending' | 'running' | 'success' | 'error'
+
+export interface DeployStep {
+  id: string
+  title: string
+  status: DeployStepStatus
+  message?: string
+}
+
+export interface DeployTask {
+  id: string
+  status: 'running' | 'success' | 'error'
+  steps: DeployStep[]
+  result?: {
+    zipSize?: string
+    remotePath?: string
+    backupPath?: string
+  }
+  error?: string
+  startTime: number
+  endTime?: number
+}
+
+export interface DeployMessage {
+  type: 'deploy:progress' | 'deploy:complete' | 'deploy:error'
+  taskId: string
+  task: DeployTask
+}
+
+export interface StartDeployResult {
+  taskId: string
+}
+
+export interface TaskStatusResult {
+  task: DeployTask | null
+}
+
+export interface ConnectionTestResult {
+  connected: boolean
+}
+
 // ========== Category API ==========
 export const categoryApi = {
   getCategories: () => http.get<{ categories: Category[] }>('/categories'),
@@ -265,4 +313,15 @@ export const imageApi = {
   getImageConfig: () => http.get<ImageConfig>('/images/config'),
 
   testQiniuUpload: (config: QiniuConfig) => http.post('/images/qiniu/test-upload', config)
+}
+
+// ========== Deploy API ==========
+export const deployApi = {
+  getStatus: () => http.get<DeployStatus>('/deploy/status'),
+
+  startDeploy: () => http.post<StartDeployResult>('/deploy/start', {}),
+
+  getTaskStatus: () => http.get<TaskStatusResult>('/deploy/task'),
+
+  testConnection: () => http.post<ConnectionTestResult>('/deploy/test-connection', {})
 }

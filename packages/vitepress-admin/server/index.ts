@@ -7,7 +7,9 @@ import categoryRoutes from './routes/categoryRoutes.js'
 import topicRoutes from './routes/topicRoutes.js'
 import imageRoutes from './routes/imageRoutes.js'
 import articleRoutes from './routes/articleRoutes.js'
+import deployRoutes from './routes/deployRoutes.js'
 import { fileWatcher } from './services/watcher.js'
+import { deployService } from './controllers/deploy/index.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getProjectRoot } from './config/paths.js'
@@ -77,6 +79,7 @@ app.use('/api/categories', categoryRoutes)
 app.use('/api', topicRoutes)
 app.use('/api/images', imageRoutes)
 app.use('/api', articleRoutes)
+app.use('/api/deploy', deployRoutes)
 
 // Integrate Vite in development mode
 async function setupVite(): Promise<void> {
@@ -127,6 +130,7 @@ wss.on('connection', (ws: WebSocket) => {
   console.log('新的WebSocket连接')
 
   fileWatcher.addClient(ws)
+  deployService.addClient(ws)
 
   ws.on('error', console.error)
 })
