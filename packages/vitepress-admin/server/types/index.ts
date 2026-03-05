@@ -2,6 +2,7 @@
 // Common types are the base, other modules may re-export them
 export * from './common.js'
 export * from './topic.js'
+export * from './server.js'
 
 // Image types - selectively export to avoid conflicts
 export type {

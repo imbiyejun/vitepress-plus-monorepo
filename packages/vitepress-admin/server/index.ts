@@ -8,8 +8,11 @@ import topicRoutes from './routes/topicRoutes.js'
 import imageRoutes from './routes/imageRoutes.js'
 import articleRoutes from './routes/articleRoutes.js'
 import deployRoutes from './routes/deployRoutes.js'
+import serverRoutes from './routes/serverRoutes.js'
 import { fileWatcher } from './services/watcher.js'
 import { deployService } from './controllers/deploy/index.js'
+import { serverService } from './services/serverService.js'
+import type { TerminalMessage } from './types/server.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getProjectRoot } from './config/paths.js'
@@ -80,6 +83,7 @@ app.use('/api', topicRoutes)
 app.use('/api/images', imageRoutes)
 app.use('/api', articleRoutes)
 app.use('/api/deploy', deployRoutes)
+app.use('/api/server', serverRoutes)
 
 // Integrate Vite in development mode
 async function setupVite(): Promise<void> {
@@ -131,6 +135,56 @@ wss.on('connection', (ws: WebSocket) => {
 
   fileWatcher.addClient(ws)
   deployService.addClient(ws)
+
+  // Handle terminal messages
+  ws.on('message', async data => {
+    try {
+      const message = JSON.parse(data.toString()) as TerminalMessage
+
+      switch (message.type) {
+        case 'terminal:connect':
+          try {
+            const session = await serverService.createTerminalSession(ws)
+            ws.send(
+              JSON.stringify({
+                type: 'terminal:connect',
+                sessionId: session.id,
+                data: 'Terminal connected'
+              })
+            )
+          } catch (err) {
+            ws.send(
+              JSON.stringify({
+                type: 'terminal:error',
+                sessionId: '',
+                error: err instanceof Error ? err.message : 'Failed to create terminal session'
+              })
+            )
+          }
+          break
+
+        case 'terminal:data':
+          if (message.sessionId && message.data) {
+            serverService.handleTerminalInput(message.sessionId, message.data)
+          }
+          break
+
+        case 'terminal:resize':
+          if (message.sessionId && message.cols && message.rows) {
+            serverService.resizeTerminal(message.sessionId, message.cols, message.rows)
+          }
+          break
+
+        case 'terminal:disconnect':
+          if (message.sessionId) {
+            serverService.closeTerminalSession(message.sessionId)
+          }
+          break
+      }
+    } catch {
+      // Not a terminal message, ignore
+    }
+  })
 
   ws.on('error', console.error)
 })

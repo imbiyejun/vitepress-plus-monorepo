@@ -325,3 +325,108 @@ export const deployApi = {
 
   testConnection: () => http.post<ConnectionTestResult>('/deploy/test-connection', {})
 }
+
+// ========== Server Management Types ==========
+export interface ServerStatus {
+  configured: boolean
+  host?: string
+  username?: string
+}
+
+export interface ServerFileInfo {
+  name: string
+  path: string
+  type: 'file' | 'directory' | 'symlink'
+  size: number
+  mode: string
+  modifyTime: string
+  accessTime: string
+  owner: number
+  group: number
+}
+
+export interface ServerBreadcrumb {
+  name: string
+  path: string
+}
+
+export interface ServerDirectoryContents {
+  items: ServerFileInfo[]
+  currentPath: string
+  breadcrumbs: ServerBreadcrumb[]
+}
+
+export interface FileContentResult {
+  content: string
+  path: string
+  size: number
+  encoding: string
+}
+
+export interface UploadResult {
+  success: boolean
+  filename: string
+  remotePath: string
+  size: number
+  message?: string
+}
+
+export interface TerminalMessage {
+  type:
+    | 'terminal:data'
+    | 'terminal:resize'
+    | 'terminal:connect'
+    | 'terminal:disconnect'
+    | 'terminal:error'
+  sessionId: string
+  data?: string
+  cols?: number
+  rows?: number
+  error?: string
+}
+
+// ========== Server API ==========
+export const serverApi = {
+  getStatus: () => http.get<ServerStatus>('/server/status'),
+
+  testConnection: () => http.post<{ connected: boolean }>('/server/test-connection', {}),
+
+  listDirectory: (path?: string) =>
+    http.get<ServerDirectoryContents>('/server/directory', { params: { path: path || '/' } }),
+
+  readFile: (path: string, maxSize?: number) =>
+    http.get<FileContentResult>('/server/file', { params: { path, maxSize } }),
+
+  writeFile: (path: string, content: string) =>
+    http.put('/server/file', { path, content }, { showSuccess: true }),
+
+  createDirectory: (path: string) =>
+    http.post('/server/directory', { path }, { showSuccess: true }),
+
+  deleteFile: (path: string) => http.delete('/server/file', { data: { path }, showSuccess: true }),
+
+  deleteDirectory: (path: string, recursive?: boolean) =>
+    http.delete('/server/directory', { data: { path, recursive }, showSuccess: true }),
+
+  rename: (oldPath: string, newPath: string) =>
+    http.post('/server/rename', { oldPath, newPath }, { showSuccess: true }),
+
+  uploadFile: (file: File, remotePath: string) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('remotePath', remotePath)
+    return http.upload<UploadResult>('/server/upload', formData)
+  },
+
+  uploadFiles: (files: File[], remotePath: string) => {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+    formData.append('remotePath', remotePath)
+    return http.upload<UploadResult[]>('/server/upload-multiple', formData)
+  },
+
+  downloadFile: async (remotePath: string): Promise<void> => {
+    const filename = remotePath.split('/').pop() || 'download'
+    await http.download('/server/download', filename, { params: { path: remotePath } })
+  }
+}

@@ -72,6 +72,15 @@ export class WebSocketService {
     return () => this.messageHandlers.delete(handler)
   }
 
+  // Send message to server
+  public send(data: unknown): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data))
+    } else {
+      console.warn('WebSocket is not connected')
+    }
+  }
+
   public close() {
     if (this.reconnectTimer) {
       window.clearTimeout(this.reconnectTimer)

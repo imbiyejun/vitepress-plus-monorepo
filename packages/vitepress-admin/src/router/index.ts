@@ -90,6 +90,15 @@ const router = createRouter({
             title: '一键部署',
             icon: 'CloudUploadOutlined'
           }
+        },
+        {
+          path: 'server',
+          name: 'server',
+          component: () => import('../views/server/ServerManager.vue'),
+          meta: {
+            title: '服务器管理',
+            icon: 'CloudServerOutlined'
+          }
         }
       ]
     },

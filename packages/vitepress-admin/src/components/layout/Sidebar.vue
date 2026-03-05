@@ -72,7 +72,8 @@ import {
   BookOutlined,
   PictureOutlined,
   FileTextOutlined,
-  CloudUploadOutlined
+  CloudUploadOutlined,
+  CloudServerOutlined
 } from '@ant-design/icons-vue'
 
 interface RouteMeta {
@@ -108,13 +109,14 @@ const collapsed = computed({
 const selectedKeys = ref<string[]>([])
 const openKeys = ref<string[]>([])
 
-// 图标组件映射
+// Icon component mapping
 const icons = {
   HomeOutlined,
   BookOutlined,
   PictureOutlined,
   FileTextOutlined,
-  CloudUploadOutlined
+  CloudUploadOutlined,
+  CloudServerOutlined
 } as const
 
 // 获取图标组件
