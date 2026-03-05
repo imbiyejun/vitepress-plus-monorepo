@@ -16,6 +16,7 @@ import {
   uploadFiles,
   downloadFile
 } from '../controllers/server/index.js'
+import { getEnvStatus, startInit, getInitTask } from '../controllers/server/init.js'
 
 const router: express.Router = express.Router()
 
@@ -46,5 +47,10 @@ router.post('/rename', rename)
 router.post('/upload', upload.single('file'), uploadFile)
 router.post('/upload-multiple', upload.array('files', 20), uploadFiles)
 router.get('/download', downloadFile)
+
+// Server initialization
+router.get('/init/env-status', getEnvStatus)
+router.post('/init/start', startInit)
+router.get('/init/task', getInitTask)
 
 export default router

@@ -12,7 +12,8 @@ import serverRoutes from './routes/serverRoutes.js'
 import { fileWatcher } from './services/watcher.js'
 import { deployService } from './controllers/deploy/index.js'
 import { serverService } from './services/serverService.js'
-import type { TerminalMessage } from './types/server.js'
+import { serverInitService } from './services/serverInitService.js'
+import type { TerminalMessage, InitMessage } from './types/server.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getProjectRoot } from './config/paths.js'
@@ -128,6 +129,15 @@ const server = createHttpServer(app)
 
 // Create WebSocket server
 const wss = new WebSocketServer({ server })
+
+// Broadcast init progress to all connected clients
+serverInitService.setBroadcast((message: InitMessage) => {
+  wss.clients.forEach(client => {
+    if (client.readyState === 1) {
+      client.send(JSON.stringify(message))
+    }
+  })
+})
 
 // WebSocket connection handling
 wss.on('connection', (ws: WebSocket) => {

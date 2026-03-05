@@ -385,6 +385,60 @@ export interface TerminalMessage {
   error?: string
 }
 
+// Server initialization types
+export interface ServerInitConfig {
+  domain?: string
+  sslCertPath?: string
+  sslKeyPath?: string
+  enableSsl?: boolean
+  webRoot?: string
+  nodeVersion?: string
+  serverIp?: string
+}
+
+export type InitStepStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped'
+
+export interface InitStep {
+  id: string
+  title: string
+  status: InitStepStatus
+  message?: string
+  output?: string
+  logs?: string[]
+  startTime?: number
+  endTime?: number
+}
+
+export interface InitTask {
+  id: string
+  status: 'running' | 'success' | 'error'
+  steps: InitStep[]
+  config: ServerInitConfig
+  startTime: number
+  endTime?: number
+  error?: string
+}
+
+export interface InitMessage {
+  type: 'init:progress' | 'init:complete' | 'init:error'
+  taskId: string
+  task: InitTask
+}
+
+export interface ServerEnvStatus {
+  hasNginx: boolean
+  hasNode: boolean
+  hasPnpm: boolean
+  hasGit: boolean
+  hasPm2: boolean
+  nodeVersion?: string
+  nginxVersion?: string
+  sslConfigured?: boolean
+  domain?: string
+  serverIp?: string
+  remotePath?: string
+}
+
 // ========== Server API ==========
 export const serverApi = {
   getStatus: () => http.get<ServerStatus>('/server/status'),
@@ -428,5 +482,13 @@ export const serverApi = {
   downloadFile: async (remotePath: string): Promise<void> => {
     const filename = remotePath.split('/').pop() || 'download'
     await http.download('/server/download', filename, { params: { path: remotePath } })
-  }
+  },
+
+  // Server initialization
+  getEnvStatus: () => http.get<ServerEnvStatus>('/server/init/env-status'),
+
+  startInit: (config: ServerInitConfig) =>
+    http.post<{ taskId: string }>('/server/init/start', config),
+
+  getInitTask: () => http.get<{ task: InitTask | null }>('/server/init/task')
 }

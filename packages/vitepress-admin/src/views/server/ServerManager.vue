@@ -4,6 +4,10 @@
       <div class="header-content">
         <h2>服务器管理</h2>
         <a-space>
+          <a-button type="primary" @click="showInitModal = true">
+            <template #icon><SettingOutlined /></template>
+            一键初始化
+          </a-button>
           <a-button :loading="testingConnection" @click="handleTestConnection">
             <template #icon><ApiOutlined /></template>
             测试连接
@@ -208,11 +212,266 @@ DEPLOY_PASSWORD=your_password</pre
         class="code-editor"
       />
     </a-modal>
+
+    <!-- Server Init Modal -->
+    <a-modal
+      v-model:open="showInitModal"
+      title="一键初始化服务器环境"
+      width="700px"
+      :footer="null"
+      :maskClosable="!initTask || initTask.status !== 'running'"
+      :closable="!initTask || initTask.status !== 'running'"
+      @cancel="handleInitModalClose"
+    >
+      <div class="init-modal-content">
+        <!-- Environment Status -->
+        <a-card
+          title="当前环境状态"
+          size="small"
+          style="margin-bottom: 16px"
+          :loading="loadingEnvStatus"
+        >
+          <a-row :gutter="16" v-if="envStatus">
+            <a-col :span="8">
+              <a-statistic title="Nginx">
+                <template #formatter>
+                  <a-tag :color="envStatus.hasNginx ? 'success' : 'default'">
+                    {{ envStatus.hasNginx ? envStatus.nginxVersion || '已安装' : '未安装' }}
+                  </a-tag>
+                </template>
+              </a-statistic>
+            </a-col>
+            <a-col :span="8">
+              <a-statistic title="Node.js">
+                <template #formatter>
+                  <a-tag :color="envStatus.hasNode ? 'success' : 'default'">
+                    {{ envStatus.hasNode ? envStatus.nodeVersion || '已安装' : '未安装' }}
+                  </a-tag>
+                </template>
+              </a-statistic>
+            </a-col>
+            <a-col :span="8">
+              <a-statistic title="pnpm">
+                <template #formatter>
+                  <a-tag :color="envStatus.hasPnpm ? 'success' : 'default'">
+                    {{ envStatus.hasPnpm ? '已安装' : '未安装' }}
+                  </a-tag>
+                </template>
+              </a-statistic>
+            </a-col>
+            <a-col :span="8" style="margin-top: 12px">
+              <a-statistic title="PM2">
+                <template #formatter>
+                  <a-tag :color="envStatus.hasPm2 ? 'success' : 'default'">
+                    {{ envStatus.hasPm2 ? '已安装' : '未安装' }}
+                  </a-tag>
+                </template>
+              </a-statistic>
+            </a-col>
+            <a-col :span="8" style="margin-top: 12px">
+              <a-statistic title="Git">
+                <template #formatter>
+                  <a-tag :color="envStatus.hasGit ? 'success' : 'default'">
+                    {{ envStatus.hasGit ? '已安装' : '未安装' }}
+                  </a-tag>
+                </template>
+              </a-statistic>
+            </a-col>
+            <a-col :span="8" style="margin-top: 12px">
+              <a-button size="small" @click="loadEnvStatus">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
+            </a-col>
+          </a-row>
+          <a-divider style="margin: 12px 0" />
+          <a-descriptions :column="1" size="small">
+            <a-descriptions-item label="访问方式">
+              <a-tag v-if="envStatus?.domain" color="blue"> 域名: {{ envStatus?.domain }} </a-tag>
+              <a-tag v-else-if="envStatus?.serverIp" color="orange">
+                IP: {{ envStatus?.serverIp }}
+              </a-tag>
+              <a-tag v-else color="default">未配置</a-tag>
+            </a-descriptions-item>
+            <a-descriptions-item label="部署路径">
+              {{ envStatus?.remotePath || '/var/www/vitepress' }}
+            </a-descriptions-item>
+          </a-descriptions>
+          <a-alert
+            v-if="!envStatus?.domain"
+            message="提示: 可在 .env 文件中添加 DEPLOY_DOMAIN 配置域名"
+            type="info"
+            show-icon
+            style="margin-top: 8px"
+          />
+        </a-card>
+
+        <!-- Init Configuration -->
+        <a-card
+          title="初始化配置"
+          size="small"
+          style="margin-bottom: 16px"
+          v-if="!initTask || initTask.status !== 'running'"
+        >
+          <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
+            <a-form-item label="网站目录">
+              <a-input
+                v-model:value="initConfig.webRoot"
+                :placeholder="envStatus?.remotePath || '/var/www/vitepress'"
+              />
+              <template #extra v-if="envStatus?.remotePath">
+                <small>将使用环境变量配置的路径: {{ envStatus.remotePath }}</small>
+              </template>
+            </a-form-item>
+            <a-form-item label="Node.js 版本">
+              <a-select v-model:value="initConfig.nodeVersion" style="width: 100%">
+                <a-select-option value="18">Node.js 18 LTS</a-select-option>
+                <a-select-option value="20">Node.js 20 LTS</a-select-option>
+                <a-select-option value="22">Node.js 22</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="访问域名">
+              <a-input
+                v-model:value="initConfig.domain"
+                :placeholder="envStatus?.domain || '留空则使用IP访问'"
+              />
+              <template #extra>
+                <small v-if="envStatus?.domain">
+                  将使用环境变量配置的域名: {{ envStatus.domain }}
+                </small>
+                <small v-else-if="envStatus?.serverIp">
+                  未配置域名，将使用 IP 访问: {{ envStatus.serverIp }}
+                </small>
+              </template>
+            </a-form-item>
+            <a-form-item label="启用 SSL">
+              <a-switch
+                v-model:checked="initConfig.enableSsl"
+                :disabled="!initConfig.domain && !envStatus?.domain"
+              />
+              <template #extra v-if="!initConfig.domain && !envStatus?.domain">
+                <small>需要配置域名才能启用 SSL</small>
+              </template>
+            </a-form-item>
+            <template v-if="initConfig.enableSsl">
+              <a-form-item label="SSL 证书路径">
+                <a-input
+                  v-model:value="initConfig.sslCertPath"
+                  placeholder="留空则使用 Let's Encrypt 自动申请"
+                />
+              </a-form-item>
+              <a-form-item label="SSL 密钥路径">
+                <a-input
+                  v-model:value="initConfig.sslKeyPath"
+                  placeholder="留空则使用 Let's Encrypt 自动申请"
+                />
+              </a-form-item>
+            </template>
+          </a-form>
+          <a-button type="primary" block :loading="startingInit" @click="handleStartInit">
+            <template #icon><ThunderboltOutlined /></template>
+            开始初始化
+          </a-button>
+        </a-card>
+
+        <!-- Init Progress -->
+        <a-card title="初始化进度" size="small" v-if="initTask">
+          <!-- Overall Progress -->
+          <div class="init-progress-header" v-if="initTask.status === 'running'">
+            <a-progress
+              :percent="overallProgress"
+              status="active"
+              :stroke-color="{ from: '#108ee9', to: '#87d068' }"
+            />
+            <div class="elapsed-time">已用时: {{ formatElapsedTime(initTask.startTime) }}</div>
+          </div>
+
+          <a-collapse v-model:activeKey="activeStepKeys" class="init-steps-collapse">
+            <a-collapse-panel
+              v-for="step in initTask.steps"
+              :key="step.id"
+              :collapsible="step.logs && step.logs.length > 0 ? undefined : 'disabled'"
+            >
+              <template #header>
+                <div class="step-header">
+                  <span class="step-icon">
+                    <LoadingOutlined v-if="step.status === 'running'" spin />
+                    <CheckCircleOutlined
+                      v-else-if="step.status === 'success'"
+                      style="color: #52c41a"
+                    />
+                    <CloseCircleOutlined
+                      v-else-if="step.status === 'error'"
+                      style="color: #ff4d4f"
+                    />
+                    <ClockCircleOutlined v-else style="color: #d9d9d9" />
+                  </span>
+                  <span class="step-title">{{ step.title }}</span>
+                  <span class="step-duration" v-if="step.startTime">
+                    {{ formatStepDuration(step) }}
+                  </span>
+                </div>
+              </template>
+              <template #extra>
+                <a-tag v-if="step.status === 'running'" color="processing">执行中</a-tag>
+                <a-tag v-else-if="step.status === 'success'" color="success">{{
+                  step.message
+                }}</a-tag>
+                <a-tag v-else-if="step.status === 'error'" color="error">失败</a-tag>
+                <a-tag v-else color="default">等待中</a-tag>
+              </template>
+              <!-- Step Logs -->
+              <div class="step-logs" v-if="step.logs && step.logs.length > 0">
+                <div
+                  v-for="(log, idx) in step.logs"
+                  :key="idx"
+                  class="log-line"
+                  :class="{ 'log-success': log.includes('✓'), 'log-error': log.includes('✗') }"
+                >
+                  {{ log }}
+                </div>
+              </div>
+            </a-collapse-panel>
+          </a-collapse>
+
+          <div class="init-result" v-if="initTask.status !== 'running'">
+            <a-result
+              v-if="initTask.status === 'success'"
+              status="success"
+              title="初始化完成"
+              :sub-title="initSuccessMessage"
+            >
+              <template #extra>
+                <a-space direction="vertical" align="center">
+                  <div v-if="accessUrl" class="access-url">
+                    访问地址: <a :href="accessUrl" target="_blank">{{ accessUrl }}</a>
+                  </div>
+                  <a-button type="primary" @click="handleInitModalClose">完成</a-button>
+                </a-space>
+              </template>
+            </a-result>
+            <a-result
+              v-else-if="initTask.status === 'error'"
+              status="error"
+              title="初始化失败"
+              :sub-title="initTask.error"
+            >
+              <template #extra>
+                <a-space>
+                  <a-button @click="initTask = null">重新配置</a-button>
+                  <a-button type="primary" @click="handleStartInit">重试</a-button>
+                </a-space>
+              </template>
+            </a-result>
+          </div>
+        </a-card>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   ApiOutlined,
@@ -227,7 +486,13 @@ import {
   DeleteOutlined,
   CodeOutlined,
   DisconnectOutlined,
-  InboxOutlined
+  InboxOutlined,
+  SettingOutlined,
+  ThunderboltOutlined,
+  LoadingOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons-vue'
 import type { UploadFile } from 'ant-design-vue'
 import {
@@ -235,7 +500,12 @@ import {
   type ServerStatus,
   type ServerDirectoryContents,
   type ServerFileInfo,
-  type TerminalMessage
+  type TerminalMessage,
+  type ServerInitConfig,
+  type ServerEnvStatus,
+  type InitTask,
+  type InitMessage,
+  type InitStep
 } from '@/services/api'
 import { wsService } from '@/services/websocket'
 import { Terminal } from '@xterm/xterm'
@@ -277,6 +547,22 @@ const showEditorModal = ref(false)
 const editingFile = ref<ServerFileInfo | null>(null)
 const fileContent = ref('')
 const savingFile = ref(false)
+
+// Server init state
+const showInitModal = ref(false)
+const loadingEnvStatus = ref(false)
+const envStatus = ref<ServerEnvStatus | null>(null)
+const initConfig = ref<ServerInitConfig>({
+  webRoot: '/var/www/vitepress',
+  nodeVersion: '20',
+  enableSsl: false,
+  domain: '',
+  sslCertPath: '',
+  sslKeyPath: ''
+})
+const startingInit = ref(false)
+const initTask = ref<InitTask | null>(null)
+const activeStepKeys = ref<string[]>([])
 
 // Terminal state
 const terminalRef = ref<HTMLElement | null>(null)
@@ -572,11 +858,34 @@ const disconnectTerminal = () => {
 
 // Handle terminal WebSocket messages
 const handleWsMessage = (data: unknown) => {
-  const msg = data as TerminalMessage
+  const msg = data as TerminalMessage | InitMessage
 
-  switch (msg.type) {
+  // Handle init messages
+  if (msg.type?.startsWith('init:')) {
+    const initMsg = msg as InitMessage
+    initTask.value = initMsg.task
+
+    // Auto-expand running step
+    const runningStep = initMsg.task.steps.find(s => s.status === 'running')
+    if (runningStep && !activeStepKeys.value.includes(runningStep.id)) {
+      activeStepKeys.value = [runningStep.id]
+    }
+
+    if (initMsg.type === 'init:complete') {
+      message.success('服务器环境初始化完成')
+      activeStepKeys.value = []
+      loadEnvStatus()
+    } else if (initMsg.type === 'init:error') {
+      message.error('初始化失败: ' + initMsg.task.error)
+    }
+    return
+  }
+
+  const termMsg = msg as TerminalMessage
+
+  switch (termMsg.type) {
     case 'terminal:connect':
-      terminalSessionId.value = msg.sessionId
+      terminalSessionId.value = termMsg.sessionId
       terminalConnected.value = true
       terminalConnecting.value = false
 
@@ -601,8 +910,8 @@ const handleWsMessage = (data: unknown) => {
       break
 
     case 'terminal:data':
-      if (msg.data) {
-        terminal?.write(msg.data)
+      if (termMsg.data) {
+        terminal?.write(termMsg.data)
       }
       break
 
@@ -614,7 +923,7 @@ const handleWsMessage = (data: unknown) => {
 
     case 'terminal:error':
       terminalConnecting.value = false
-      message.error(msg.error || '终端错误')
+      message.error(termMsg.error || '终端错误')
       break
   }
 }
@@ -634,7 +943,101 @@ const handleResize = () => {
   }
 }
 
+// Server init functions
+const loadEnvStatus = async () => {
+  loadingEnvStatus.value = true
+  try {
+    envStatus.value = await serverApi.getEnvStatus()
+  } catch (error) {
+    console.error('Failed to load env status:', error)
+  } finally {
+    loadingEnvStatus.value = false
+  }
+}
+
+const handleStartInit = async () => {
+  if (initConfig.value.enableSsl && !initConfig.value.domain) {
+    message.warning('启用 SSL 时必须填写域名')
+    return
+  }
+
+  startingInit.value = true
+  try {
+    await serverApi.startInit(initConfig.value)
+    message.info('初始化任务已启动')
+  } catch (error) {
+    console.error('Failed to start init:', error)
+  } finally {
+    startingInit.value = false
+  }
+}
+
+const handleInitModalClose = () => {
+  if (initTask.value?.status === 'running') {
+    return
+  }
+  showInitModal.value = false
+  initTask.value = null
+}
+
+const accessUrl = computed(() => {
+  if (!initTask.value?.config) return ''
+  const config = initTask.value.config
+  const protocol = config.enableSsl ? 'https' : 'http'
+  const host = config.domain || config.serverIp || envStatus.value?.serverIp
+  if (!host) return ''
+  return `${protocol}://${host}`
+})
+
+const initSuccessMessage = computed(() => {
+  const config = initTask.value?.config
+  if (!config) return '服务器环境已配置完成，可以开始部署项目了'
+
+  const accessType = config.domain
+    ? `域名 ${config.domain}`
+    : config.serverIp
+      ? `IP ${config.serverIp}`
+      : 'IP'
+
+  return `服务器环境已配置完成，Nginx 已配置为通过 ${accessType} 访问`
+})
+
+const overallProgress = computed(() => {
+  if (!initTask.value) return 0
+  const steps = initTask.value.steps
+  const completed = steps.filter(s => s.status === 'success' || s.status === 'skipped').length
+  const running = steps.find(s => s.status === 'running')
+  const progress = (completed / steps.length) * 100
+  return Math.round(running ? progress + 100 / steps.length / 2 : progress)
+})
+
+const formatElapsedTime = (startTime: number): string => {
+  const elapsed = Date.now() - startTime
+  const seconds = Math.floor(elapsed / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes > 0) {
+    return `${minutes}分${remainingSeconds}秒`
+  }
+  return `${seconds}秒`
+}
+
+const formatStepDuration = (step: InitStep): string => {
+  if (!step.startTime) return ''
+  const endTime = step.endTime || Date.now()
+  const duration = endTime - step.startTime
+  const seconds = Math.floor(duration / 1000)
+  return seconds > 0 ? `${seconds}s` : ''
+}
+
 let unsubscribe: (() => void) | null = null
+
+// Load env status when init modal opens
+watch(showInitModal, newVal => {
+  if (newVal && !envStatus.value) {
+    loadEnvStatus()
+  }
+})
 
 onMounted(() => {
   loadStatus()
@@ -756,5 +1159,89 @@ onUnmounted(() => {
 
 .code-editor:focus {
   box-shadow: none;
+}
+
+.init-modal-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.init-progress-header {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+.elapsed-time {
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  margin-top: 8px;
+}
+
+.init-steps-collapse {
+  margin-bottom: 16px;
+}
+
+.init-steps-collapse :deep(.ant-collapse-header) {
+  padding: 8px 12px !important;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-icon {
+  font-size: 16px;
+}
+
+.step-title {
+  flex: 1;
+}
+
+.step-duration {
+  font-size: 12px;
+  color: #999;
+}
+
+.step-logs {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #1e1e1e;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Fira Code', Consolas, Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-line {
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-line.log-success {
+  color: #52c41a;
+}
+
+.log-line.log-error {
+  color: #ff4d4f;
+}
+
+.init-result {
+  margin-top: 16px;
+}
+
+.access-url {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.access-url a {
+  color: #1890ff;
 }
 </style>

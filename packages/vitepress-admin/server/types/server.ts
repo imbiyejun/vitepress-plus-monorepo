@@ -92,3 +92,63 @@ export interface DownloadResult {
   localPath: string
   size: number
 }
+
+// Server environment initialization types
+export interface ServerInitConfig {
+  domain?: string
+  sslCertPath?: string
+  sslKeyPath?: string
+  enableSsl?: boolean
+  webRoot?: string
+  nodeVersion?: string
+  serverIp?: string
+}
+
+export type InitStepStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped'
+
+export interface InitStep {
+  id: string
+  title: string
+  status: InitStepStatus
+  message?: string
+  output?: string
+  logs?: string[]
+  startTime?: number
+  endTime?: number
+}
+
+export interface InitTask {
+  id: string
+  status: 'running' | 'success' | 'error'
+  steps: InitStep[]
+  config: ServerInitConfig
+  startTime: number
+  endTime?: number
+  error?: string
+}
+
+export interface InitMessage {
+  type: 'init:progress' | 'init:complete' | 'init:error'
+  taskId: string
+  task: InitTask
+}
+
+export interface ServerEnvStatus {
+  hasNginx: boolean
+  hasNode: boolean
+  hasPnpm: boolean
+  hasGit: boolean
+  hasPm2: boolean
+  nodeVersion?: string
+  nginxVersion?: string
+  sslConfigured?: boolean
+  domain?: string
+  serverIp?: string
+  remotePath?: string
+}
+
+export interface CommandResult {
+  success: boolean
+  output: string
+  exitCode: number
+}

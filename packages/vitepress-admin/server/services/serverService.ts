@@ -7,7 +7,8 @@ import type {
   ServerBreadcrumb,
   TerminalSession,
   TerminalMessage,
-  FileContentResult
+  FileContentResult,
+  CommandResult
 } from '../types/server.js'
 import fs from 'fs'
 import path from 'path'
@@ -499,6 +500,65 @@ class ServerService {
   // Check if terminal session exists
   hasTerminalSession(sessionId: string): boolean {
     return this.terminals.has(sessionId)
+  }
+
+  // Execute SSH command and return result
+  async executeCommand(command: string, timeout: number = 120000): Promise<CommandResult> {
+    const config = this.getServerConfig()
+    if (!config) throw new Error('Server configuration not found')
+
+    const client = new SSHClient()
+
+    return new Promise<CommandResult>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        client.end()
+        reject(new Error('Command execution timeout'))
+      }, timeout)
+
+      client.on('ready', () => {
+        client.exec(command, (err, stream) => {
+          if (err) {
+            clearTimeout(timeoutId)
+            client.end()
+            reject(err)
+            return
+          }
+
+          let stdout = ''
+          let stderr = ''
+
+          stream.on('data', (data: Buffer) => {
+            stdout += data.toString()
+          })
+
+          stream.stderr.on('data', (data: Buffer) => {
+            stderr += data.toString()
+          })
+
+          stream.on('close', (code: number) => {
+            clearTimeout(timeoutId)
+            client.end()
+            resolve({
+              success: code === 0,
+              output: stdout + stderr,
+              exitCode: code
+            })
+          })
+        })
+      })
+
+      client.on('error', err => {
+        clearTimeout(timeoutId)
+        reject(err)
+      })
+
+      client.connect({
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: config.password
+      })
+    })
   }
 }
 
