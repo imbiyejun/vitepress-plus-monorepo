@@ -79,22 +79,67 @@ DEPLOY_REMOTE_PATH=/var/www/html</pre
           <!-- Deploy Progress -->
           <template v-if="currentTask">
             <div class="section-title">部署进度</div>
-            <div class="deploy-steps">
-              <a-steps
-                :current="currentStepIndex"
-                :status="stepsStatus"
-                direction="vertical"
-                size="small"
-              >
-                <a-step
-                  v-for="step in currentTask.steps"
-                  :key="step.id"
-                  :title="step.title"
-                  :description="step.message"
-                  :status="getStepStatus(step.status)"
-                />
-              </a-steps>
+
+            <!-- Overall Progress -->
+            <div class="deploy-progress-header" v-if="currentTask.status === 'running'">
+              <a-progress
+                :percent="overallProgress"
+                status="active"
+                :stroke-color="{ from: '#108ee9', to: '#87d068' }"
+              />
+              <div class="elapsed-time">已用时: {{ formatElapsedTime(currentTask.startTime) }}</div>
             </div>
+
+            <!-- Steps with Logs -->
+            <a-collapse v-model:activeKey="activeStepKeys" class="deploy-steps-collapse">
+              <a-collapse-panel
+                v-for="step in currentTask.steps"
+                :key="step.id"
+                :collapsible="step.logs && step.logs.length > 0 ? undefined : 'disabled'"
+              >
+                <template #header>
+                  <div class="step-header">
+                    <span class="step-icon">
+                      <LoadingOutlined v-if="step.status === 'running'" spin />
+                      <CheckCircleOutlined
+                        v-else-if="step.status === 'success'"
+                        style="color: #52c41a"
+                      />
+                      <CloseCircleOutlined
+                        v-else-if="step.status === 'error'"
+                        style="color: #ff4d4f"
+                      />
+                      <ClockCircleOutlined v-else style="color: #d9d9d9" />
+                    </span>
+                    <span class="step-title">{{ step.title }}</span>
+                    <span class="step-duration" v-if="step.startTime">
+                      {{ formatStepDuration(step) }}
+                    </span>
+                  </div>
+                </template>
+                <template #extra>
+                  <a-tag v-if="step.status === 'running'" color="processing">执行中</a-tag>
+                  <a-tag v-else-if="step.status === 'success'" color="success">
+                    {{ step.message || '完成' }}
+                  </a-tag>
+                  <a-tag v-else-if="step.status === 'error'" color="error">失败</a-tag>
+                  <a-tag v-else color="default">等待</a-tag>
+                </template>
+
+                <!-- Step Logs -->
+                <div class="step-logs" v-if="step.logs && step.logs.length > 0">
+                  <div
+                    v-for="(log, idx) in step.logs"
+                    :key="idx"
+                    class="log-line"
+                    :class="{ 'log-success': log.includes('✓'), 'log-error': log.includes('✗') }"
+                  >
+                    {{ log }}
+                  </div>
+                </div>
+                <div v-else class="step-logs-empty">暂无日志</div>
+              </a-collapse-panel>
+            </a-collapse>
 
             <!-- Deploy Result -->
             <template v-if="currentTask.status === 'success'">
@@ -140,20 +185,25 @@ import {
   CloudUploadOutlined,
   ApiOutlined,
   EyeOutlined,
-  EyeInvisibleOutlined
+  EyeInvisibleOutlined,
+  LoadingOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons-vue'
 import {
   deployApi,
   type DeployStatus,
   type DeployTask,
-  type DeployMessage,
-  type DeployStepStatus
+  type DeployStep,
+  type DeployMessage
 } from '@/services/api'
 import { wsService } from '@/services/websocket'
 
 const loading = ref(false)
 const testingConnection = ref(false)
 const showHost = ref(false)
+const activeStepKeys = ref<string[]>([])
 
 const deployStatus = ref<DeployStatus>({
   configured: false
@@ -163,19 +213,14 @@ const currentTask = ref<DeployTask | null>(null)
 
 const isDeploying = computed(() => currentTask.value?.status === 'running')
 
-const currentStepIndex = computed(() => {
-  if (!currentTask.value) return -1
-  const runningIndex = currentTask.value.steps.findIndex(s => s.status === 'running')
-  if (runningIndex >= 0) return runningIndex
-  const lastSuccessIndex = currentTask.value.steps.map(s => s.status).lastIndexOf('success')
-  return lastSuccessIndex
-})
-
-const stepsStatus = computed(() => {
-  if (!currentTask.value) return 'process'
-  if (currentTask.value.status === 'error') return 'error'
-  if (currentTask.value.status === 'success') return 'finish'
-  return 'process'
+// Calculate overall progress percentage
+const overallProgress = computed(() => {
+  if (!currentTask.value) return 0
+  const steps = currentTask.value.steps
+  const completed = steps.filter(s => s.status === 'success').length
+  const running = steps.find(s => s.status === 'running')
+  const progress = (completed / steps.length) * 100
+  return Math.round(running ? progress + 100 / steps.length / 2 : progress)
 })
 
 // Mask IP address: 192.168.1.100 -> 192.***.***. 100
@@ -185,7 +230,6 @@ function maskHost(host?: string): string {
   if (parts.length === 4) {
     return `${parts[0]}.***.***. ${parts[3]}`
   }
-  // For domain names, show first and last part
   if (host.includes('.')) {
     const domainParts = host.split('.')
     if (domainParts.length >= 2) {
@@ -195,27 +239,27 @@ function maskHost(host?: string): string {
   return '***'
 }
 
-function getStepStatus(status: DeployStepStatus): 'wait' | 'process' | 'finish' | 'error' {
-  switch (status) {
-    case 'pending':
-      return 'wait'
-    case 'running':
-      return 'process'
-    case 'success':
-      return 'finish'
-    case 'error':
-      return 'error'
-    default:
-      return 'wait'
-  }
-}
-
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000)
   if (seconds < 60) return `${seconds} 秒`
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = seconds % 60
   return `${minutes} 分 ${remainingSeconds} 秒`
+}
+
+// Format elapsed time from start timestamp
+function formatElapsedTime(startTime: number): string {
+  const elapsed = Date.now() - startTime
+  return formatDuration(elapsed)
+}
+
+// Format step duration
+function formatStepDuration(step: DeployStep): string {
+  if (!step.startTime) return ''
+  const endTime = step.endTime || Date.now()
+  const duration = endTime - step.startTime
+  const seconds = Math.round(duration / 1000)
+  return seconds > 0 ? `${seconds}s` : ''
 }
 
 const loadStatus = async () => {
@@ -254,6 +298,7 @@ const handleTestConnection = async () => {
 const handleDeploy = async () => {
   try {
     currentTask.value = null
+    activeStepKeys.value = []
     await deployApi.startDeploy()
     message.info('部署任务已启动')
   } catch (error) {
@@ -273,8 +318,15 @@ function handleWsMessage(data: unknown) {
   ) {
     currentTask.value = msg.task
 
+    // Auto-expand running step
+    const runningStep = msg.task.steps.find(s => s.status === 'running')
+    if (runningStep && !activeStepKeys.value.includes(runningStep.id)) {
+      activeStepKeys.value = [runningStep.id]
+    }
+
     if (msg.type === 'deploy:complete') {
       message.success('部署成功')
+      activeStepKeys.value = []
     } else if (msg.type === 'deploy:error') {
       message.error(`部署失败: ${msg.task.error}`)
     }
@@ -358,10 +410,85 @@ onUnmounted(() => {
   border-radius: 8px;
 }
 
-.deploy-steps {
+.deploy-progress-header {
+  margin-bottom: 16px;
   padding: 16px;
   background: #fafafa;
   border-radius: 8px;
+}
+
+.elapsed-time {
+  text-align: right;
+  color: #666;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.deploy-steps-collapse {
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.deploy-steps-collapse :deep(.ant-collapse-item) {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.deploy-steps-collapse :deep(.ant-collapse-item:last-child) {
+  border-bottom: none;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-icon {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.step-title {
+  font-weight: 500;
+}
+
+.step-duration {
+  margin-left: auto;
+  color: #999;
+  font-size: 12px;
+}
+
+.step-logs {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #1e1e1e;
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-line {
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-line.log-success {
+  color: #4ec9b0;
+}
+
+.log-line.log-error {
+  color: #f48771;
+}
+
+.step-logs-empty {
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+  padding: 12px;
 }
 
 .deploy-result {

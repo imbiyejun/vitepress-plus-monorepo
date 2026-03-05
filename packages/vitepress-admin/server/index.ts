@@ -139,6 +139,15 @@ serverInitService.setBroadcast((message: InitMessage) => {
   })
 })
 
+// Broadcast deploy progress to all connected clients
+deployService.setBroadcast(message => {
+  wss.clients.forEach(client => {
+    if (client.readyState === 1) {
+      client.send(JSON.stringify(message))
+    }
+  })
+})
+
 // WebSocket connection handling
 wss.on('connection', (ws: WebSocket) => {
   console.log('新的WebSocket连接')

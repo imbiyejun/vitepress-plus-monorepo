@@ -143,6 +143,9 @@ export interface DeployStep {
   title: string
   status: DeployStepStatus
   message?: string
+  logs?: string[]
+  startTime?: number
+  endTime?: number
 }
 
 export interface DeployTask {
