@@ -86,10 +86,8 @@ async function updateMainDataFile(topic: Topic) {
   const mainDataPath = join(getTopicsDataDir(), 'index.ts')
 
   try {
-    // 读取现有文件内容
     const content = await fs.readFile(mainDataPath, 'utf-8')
 
-    // 检查是否已经导入了该专题
     const importRegex = new RegExp(
       `import\\s*{\\s*${topic.slug}Topic\\s*}\\s*from\\s*'./${topic.slug}'`
     )
@@ -97,21 +95,37 @@ async function updateMainDataFile(topic: Topic) {
 
     let newContent = content
 
-    // 如果没有导入语句，添加导入
+    // Add import statement if not exists
     if (!importRegex.test(content)) {
-      const importStatement = `import { ${topic.slug}Topic } from './${topic.slug}'\n`
-      newContent = importStatement + newContent
+      const lastImportMatch = content.match(/^import .+ from ['"][^'"]+['"]\s*$/gm)
+      if (lastImportMatch) {
+        const lastImport = lastImportMatch[lastImportMatch.length - 1]
+        const importStatement = `import { ${topic.slug}Topic } from './${topic.slug}'`
+        newContent = newContent.replace(lastImport, `${lastImport}\n${importStatement}`)
+      } else {
+        newContent = `import { ${topic.slug}Topic } from './${topic.slug}'\n${newContent}`
+      }
     }
 
-    // 如果没有专题数据，添加到topicsData对象中
+    // Add topic entry to topicsData object if not exists
     if (!topicRegex.test(content)) {
+      // Match the topicsData object and insert new entry with proper formatting
       newContent = newContent.replace(
-        /export const topicsData: TopicsData = {/,
-        `export const topicsData: TopicsData = {\n  ${topic.slug}: ${topic.slug}Topic,`
+        /export const topicsData: TopicsData = \{([\s\S]*?)\}/,
+        (match, existingContent) => {
+          const trimmedContent = existingContent.trim()
+          if (trimmedContent) {
+            // Has existing entries, append new one
+            const entriesWithoutTrailingComma = trimmedContent.replace(/,\s*$/, '')
+            return `export const topicsData: TopicsData = {\n  ${entriesWithoutTrailingComma},\n  ${topic.slug}: ${topic.slug}Topic,\n}`
+          } else {
+            // Empty object, add first entry
+            return `export const topicsData: TopicsData = {\n  ${topic.slug}: ${topic.slug}Topic,\n}`
+          }
+        }
       )
     }
 
-    // 写入文件
     await fs.writeFile(mainDataPath, newContent, 'utf-8')
   } catch (error) {
     console.error('更新主数据文件失败:', error)
@@ -232,6 +246,9 @@ export const syncTopicData = async (topicData: Topic) => {
       log.error('写入文件失败:', writeError)
       throw writeError
     }
+
+    // Update main data index file to include the new topic export
+    await updateMainDataFile(topicData)
 
     log.info('专题同步完成:', topicData.slug)
   } catch (error) {
