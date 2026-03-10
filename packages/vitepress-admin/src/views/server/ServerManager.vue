@@ -594,6 +594,8 @@ interface TerminalPane {
   sessionId: string
   terminal: Terminal | null
   fitAddon: FitAddon | null
+  /** Disposable returned by terminal.onData(), must be disposed before re-bindng */
+  onDataDisposable: { dispose(): void } | null
 }
 
 // Multi-terminal state
@@ -625,7 +627,8 @@ const createTerminalPane = (): TerminalPane => {
     connecting: false,
     sessionId: '',
     terminal: null,
-    fitAddon: null
+    fitAddon: null,
+    onDataDisposable: null
   }
 }
 
@@ -935,6 +938,8 @@ const disconnectTerminalPane = (key: string) => {
       sessionId: pane.sessionId
     })
   }
+  pane.onDataDisposable?.dispose()
+  pane.onDataDisposable = null
   pane.connected = false
   pane.sessionId = ''
   pane.terminal?.clear()
@@ -1018,13 +1023,16 @@ const handleWsMessage = (data: unknown) => {
       pane.connected = true
       pane.connecting = false
 
-      pane.terminal?.onData(inputData => {
-        wsService.send({
-          type: 'terminal:data',
-          sessionId: pane.sessionId,
-          data: inputData
-        })
-      })
+      // Dispose previous onData listener to prevent duplicate input on reconnect
+      pane.onDataDisposable?.dispose()
+      pane.onDataDisposable =
+        pane.terminal?.onData(inputData => {
+          wsService.send({
+            type: 'terminal:data',
+            sessionId: pane.sessionId,
+            data: inputData
+          })
+        }) ?? null
 
       if (pane.terminal && pane.fitAddon) {
         wsService.send({
