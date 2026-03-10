@@ -14,13 +14,6 @@
           </a-button>
         </a-space>
       </div>
-      <a-alert
-        message="服务器管理"
-        description="可视化管理远程服务器文件，支持文件上传下载、在线编辑和终端操作。"
-        type="info"
-        show-icon
-        style="margin-top: 16px"
-      />
     </div>
 
     <a-spin :spinning="loading">
@@ -44,7 +37,6 @@ DEPLOY_PASSWORD=your_password</pre
         <a-tabs v-model:activeKey="activeTab" class="server-tabs">
           <a-tab-pane key="files" tab="文件管理">
             <div class="file-manager">
-              <!-- Toolbar -->
               <div class="toolbar">
                 <a-breadcrumb>
                   <a-breadcrumb-item
@@ -69,7 +61,6 @@ DEPLOY_PASSWORD=your_password</pre
                 </a-space>
               </div>
 
-              <!-- File list -->
               <a-table
                 :dataSource="directoryContents.items"
                 :columns="fileColumns"
@@ -77,7 +68,8 @@ DEPLOY_PASSWORD=your_password</pre
                 :pagination="false"
                 rowKey="path"
                 size="small"
-                :scroll="{ y: 'calc(100vh - 400px)' }"
+                class="file-table"
+                :scroll="{ y: tableScrollY }"
               >
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'name'">
@@ -134,22 +126,49 @@ DEPLOY_PASSWORD=your_password</pre
 
           <a-tab-pane key="terminal" tab="终端">
             <div class="terminal-container">
-              <div class="terminal-toolbar">
-                <a-button
-                  v-if="!terminalConnected"
-                  type="primary"
-                  :loading="terminalConnecting"
-                  @click="connectTerminal"
+              <a-tabs
+                v-model:activeKey="activeTerminalKey"
+                type="editable-card"
+                size="small"
+                class="terminal-tabs"
+                @edit="handleTerminalTabEdit"
+                @change="handleTerminalTabChange"
+              >
+                <a-tab-pane
+                  v-for="pane in terminalPanes"
+                  :key="pane.key"
+                  :tab="pane.title"
+                  :closable="terminalPanes.length > 1"
                 >
-                  <template #icon><CodeOutlined /></template>
-                  连接终端
-                </a-button>
-                <a-button v-else danger @click="disconnectTerminal">
-                  <template #icon><DisconnectOutlined /></template>
-                  断开连接
-                </a-button>
-              </div>
-              <div ref="terminalRef" class="terminal-wrapper"></div>
+                  <div class="terminal-pane">
+                    <div class="terminal-toolbar">
+                      <a-button
+                        v-if="!pane.connected"
+                        type="primary"
+                        size="small"
+                        :loading="pane.connecting"
+                        @click="connectTerminalPane(pane.key)"
+                      >
+                        <template #icon><CodeOutlined /></template>
+                        连接终端
+                      </a-button>
+                      <a-button
+                        v-else
+                        danger
+                        size="small"
+                        @click="disconnectTerminalPane(pane.key)"
+                      >
+                        <template #icon><DisconnectOutlined /></template>
+                        断开连接
+                      </a-button>
+                    </div>
+                    <div
+                      :ref="el => setTerminalRef(pane.key, el as HTMLElement)"
+                      class="terminal-wrapper"
+                    ></div>
+                  </div>
+                </a-tab-pane>
+              </a-tabs>
             </div>
           </a-tab-pane>
         </a-tabs>
@@ -564,13 +583,72 @@ const startingInit = ref(false)
 const initTask = ref<InitTask | null>(null)
 const activeStepKeys = ref<string[]>([])
 
-// Terminal state
-const terminalRef = ref<HTMLElement | null>(null)
-const terminalConnected = ref(false)
-const terminalConnecting = ref(false)
-const terminalSessionId = ref('')
-let terminal: Terminal | null = null
-let fitAddon: FitAddon | null = null
+// Dynamic table scroll height
+const tableScrollY = ref('calc(100vh - 320px)')
+
+interface TerminalPane {
+  key: string
+  title: string
+  connected: boolean
+  connecting: boolean
+  sessionId: string
+  terminal: Terminal | null
+  fitAddon: FitAddon | null
+}
+
+// Multi-terminal state
+const terminalPanes = ref<TerminalPane[]>([])
+const activeTerminalKey = ref('')
+const terminalRefs = new Map<string, HTMLElement>()
+
+// Find the smallest available number for new terminal tab title
+const getNextTerminalNumber = (): number => {
+  const used = new Set(
+    terminalPanes.value.map(p => {
+      const m = p.title.match(/终端 (\d+)/)
+      return m ? parseInt(m[1]) : 0
+    })
+  )
+  let n = 1
+  while (used.has(n)) n++
+  return n
+}
+
+let paneIdSeed = 0
+const createTerminalPane = (): TerminalPane => {
+  paneIdSeed++
+  const num = getNextTerminalNumber()
+  return {
+    key: `term-${paneIdSeed}`,
+    title: `终端 ${num}`,
+    connected: false,
+    connecting: false,
+    sessionId: '',
+    terminal: null,
+    fitAddon: null
+  }
+}
+
+// Init first terminal pane
+const firstPane = createTerminalPane()
+terminalPanes.value.push(firstPane)
+activeTerminalKey.value = firstPane.key
+
+const setTerminalRef = (key: string, el: HTMLElement | null) => {
+  if (el) {
+    terminalRefs.set(key, el)
+  } else {
+    terminalRefs.delete(key)
+  }
+}
+
+const findPane = (key: string): TerminalPane | undefined => {
+  return terminalPanes.value.find(p => p.key === key)
+}
+
+const findPaneBySessionId = (sessionId: string): TerminalPane | undefined => {
+  return terminalPanes.value.find(p => p.sessionId === sessionId)
+}
 
 const fileColumns = [
   { title: '名称', key: 'name', ellipsis: true },
@@ -802,10 +880,10 @@ const handleCreateDirectory = async () => {
 }
 
 // Terminal functions
-const initTerminal = () => {
-  if (terminal) return
+const initTerminalInstance = (pane: TerminalPane) => {
+  if (pane.terminal) return
 
-  terminal = new Terminal({
+  pane.terminal = new Terminal({
     cursorBlink: true,
     theme: {
       background: '#1e1e1e',
@@ -815,57 +893,102 @@ const initTerminal = () => {
     fontFamily: 'Menlo, Monaco, "Courier New", monospace'
   })
 
-  fitAddon = new FitAddon()
-  terminal.loadAddon(fitAddon)
+  pane.fitAddon = new FitAddon()
+  pane.terminal.loadAddon(pane.fitAddon)
 }
 
-const connectTerminal = async () => {
-  terminalConnecting.value = true
+const connectTerminalPane = async (key: string) => {
+  const pane = findPane(key)
+  if (!pane) return
 
+  pane.connecting = true
   try {
-    initTerminal()
-
+    initTerminalInstance(pane)
     await nextTick()
 
-    if (terminalRef.value && terminal) {
-      terminal.open(terminalRef.value)
-      fitAddon?.fit()
+    const el = terminalRefs.get(key)
+    if (el && pane.terminal) {
+      pane.terminal.open(el)
+      pane.fitAddon?.fit()
     }
 
-    // Send connect message via WebSocket
+    // paneKey is sent as sessionId placeholder, server will return the real sessionId
     wsService.send({
       type: 'terminal:connect',
-      sessionId: ''
+      sessionId: '',
+      paneKey: key
     })
   } catch (error) {
     console.error('Failed to connect terminal:', error)
     message.error('连接终端失败')
-    terminalConnecting.value = false
+    pane.connecting = false
   }
 }
 
-const disconnectTerminal = () => {
-  if (terminalSessionId.value) {
+const disconnectTerminalPane = (key: string) => {
+  const pane = findPane(key)
+  if (!pane) return
+
+  if (pane.sessionId) {
     wsService.send({
       type: 'terminal:disconnect',
-      sessionId: terminalSessionId.value
+      sessionId: pane.sessionId
     })
   }
-  terminalConnected.value = false
-  terminalSessionId.value = ''
-  terminal?.clear()
+  pane.connected = false
+  pane.sessionId = ''
+  pane.terminal?.clear()
+}
+
+const disconnectAllTerminals = () => {
+  for (const pane of terminalPanes.value) {
+    if (pane.sessionId) {
+      wsService.send({
+        type: 'terminal:disconnect',
+        sessionId: pane.sessionId
+      })
+    }
+    pane.terminal?.dispose()
+  }
+}
+
+const handleTerminalTabEdit = (targetKey: string | MouseEvent, action: string) => {
+  if (action === 'add') {
+    const newPane = createTerminalPane()
+    terminalPanes.value.push(newPane)
+    activeTerminalKey.value = newPane.key
+  } else if (action === 'remove' && typeof targetKey === 'string') {
+    const pane = findPane(targetKey)
+    if (pane) {
+      disconnectTerminalPane(targetKey)
+      pane.terminal?.dispose()
+    }
+    const idx = terminalPanes.value.findIndex(p => p.key === targetKey)
+    terminalPanes.value.splice(idx, 1)
+    if (activeTerminalKey.value === targetKey && terminalPanes.value.length > 0) {
+      activeTerminalKey.value = terminalPanes.value[Math.max(0, idx - 1)].key
+    }
+  }
+}
+
+const handleTerminalTabChange = (key: string) => {
+  nextTick(() => {
+    const pane = findPane(key)
+    if (pane?.fitAddon && pane.connected) {
+      pane.fitAddon.fit()
+    }
+  })
 }
 
 // Handle terminal WebSocket messages
 const handleWsMessage = (data: unknown) => {
-  const msg = data as TerminalMessage | InitMessage
+  const msg = data as (TerminalMessage & { paneKey?: string }) | InitMessage
 
   // Handle init messages
   if (msg.type?.startsWith('init:')) {
     const initMsg = msg as InitMessage
     initTask.value = initMsg.task
 
-    // Auto-expand running step
     const runningStep = initMsg.task.steps.find(s => s.status === 'running')
     if (runningStep && !activeStepKeys.value.includes(runningStep.id)) {
       activeStepKeys.value = [runningStep.id]
@@ -881,64 +1004,79 @@ const handleWsMessage = (data: unknown) => {
     return
   }
 
-  const termMsg = msg as TerminalMessage
+  const termMsg = msg as TerminalMessage & { paneKey?: string }
 
   switch (termMsg.type) {
-    case 'terminal:connect':
-      terminalSessionId.value = termMsg.sessionId
-      terminalConnected.value = true
-      terminalConnecting.value = false
+    case 'terminal:connect': {
+      // Match pane by paneKey echoed from server, or fall back to first connecting pane
+      const pane =
+        (termMsg.paneKey ? findPane(termMsg.paneKey) : null) ||
+        terminalPanes.value.find(p => p.connecting)
+      if (!pane) break
 
-      // Setup terminal input handler
-      terminal?.onData(data => {
+      pane.sessionId = termMsg.sessionId
+      pane.connected = true
+      pane.connecting = false
+
+      pane.terminal?.onData(inputData => {
         wsService.send({
           type: 'terminal:data',
-          sessionId: terminalSessionId.value,
-          data
+          sessionId: pane.sessionId,
+          data: inputData
         })
       })
 
-      // Send initial resize
-      if (terminal && fitAddon) {
+      if (pane.terminal && pane.fitAddon) {
         wsService.send({
           type: 'terminal:resize',
-          sessionId: terminalSessionId.value,
-          cols: terminal.cols,
-          rows: terminal.rows
+          sessionId: pane.sessionId,
+          cols: pane.terminal.cols,
+          rows: pane.terminal.rows
         })
       }
       break
+    }
 
-    case 'terminal:data':
-      if (termMsg.data) {
-        terminal?.write(termMsg.data)
+    case 'terminal:data': {
+      const targetPane = findPaneBySessionId(termMsg.sessionId)
+      if (targetPane && termMsg.data) {
+        targetPane.terminal?.write(termMsg.data)
       }
       break
+    }
 
-    case 'terminal:disconnect':
-      terminalConnected.value = false
-      terminalSessionId.value = ''
+    case 'terminal:disconnect': {
+      const dcPane = findPaneBySessionId(termMsg.sessionId)
+      if (dcPane) {
+        dcPane.connected = false
+        dcPane.sessionId = ''
+      }
       message.info('终端已断开')
       break
+    }
 
-    case 'terminal:error':
-      terminalConnecting.value = false
+    case 'terminal:error': {
+      const errPane = terminalPanes.value.find(p => p.connecting)
+      if (errPane) errPane.connecting = false
       message.error(termMsg.error || '终端错误')
       break
+    }
   }
 }
 
-// Handle window resize
+// Handle window resize - refit all connected terminals
 const handleResize = () => {
-  if (fitAddon && terminalConnected.value) {
-    fitAddon.fit()
-    if (terminal && terminalSessionId.value) {
-      wsService.send({
-        type: 'terminal:resize',
-        sessionId: terminalSessionId.value,
-        cols: terminal.cols,
-        rows: terminal.rows
-      })
+  for (const pane of terminalPanes.value) {
+    if (pane.fitAddon && pane.connected) {
+      pane.fitAddon.fit()
+      if (pane.terminal && pane.sessionId) {
+        wsService.send({
+          type: 'terminal:resize',
+          sessionId: pane.sessionId,
+          cols: pane.terminal.cols,
+          rows: pane.terminal.rows
+        })
+      }
     }
   }
 }
@@ -1050,19 +1188,31 @@ onUnmounted(() => {
     unsubscribe()
   }
   window.removeEventListener('resize', handleResize)
-  disconnectTerminal()
-  terminal?.dispose()
+  disconnectAllTerminals()
 })
 </script>
 
 <style scoped>
 .server-manager {
   height: 100%;
+  display: flex;
+  flex-direction: column;
   padding: 24px;
+  overflow: hidden;
+}
+
+/* Propagate flex height through a-spin wrapper */
+.server-manager :deep(.ant-spin-nested-loading),
+.server-manager :deep(.ant-spin-container) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .server-header {
-  margin-bottom: 24px;
+  flex-shrink: 0;
+  margin-bottom: 16px;
 }
 
 .header-content {
@@ -1086,23 +1236,58 @@ onUnmounted(() => {
 }
 
 .server-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   padding: 16px;
   border-radius: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.server-tabs :deep(.ant-tabs-content-holder) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.server-tabs :deep(.ant-tabs-content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.server-tabs :deep(.ant-tabs-tabpane) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .file-manager {
-  min-height: 500px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .toolbar {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding: 12px;
   background: #fafafa;
   border-radius: 4px;
+}
+
+.file-table {
+  flex: 1;
+  overflow: hidden;
 }
 
 .file-name {
@@ -1129,13 +1314,50 @@ onUnmounted(() => {
 }
 
 .terminal-container {
-  height: 500px;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+.terminal-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.terminal-tabs :deep(.ant-tabs-content-holder) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.terminal-tabs :deep(.ant-tabs-content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.terminal-tabs :deep(.ant-tabs-tabpane) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.terminal-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .terminal-toolbar {
-  padding: 12px;
+  flex-shrink: 0;
+  padding: 8px 12px;
   background: #fafafa;
   border-radius: 4px 4px 0 0;
 }
@@ -1145,6 +1367,15 @@ onUnmounted(() => {
   background: #1e1e1e;
   border-radius: 0 0 4px 4px;
   padding: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Ensure xterm fills the wrapper */
+.terminal-wrapper :deep(.xterm),
+.terminal-wrapper :deep(.xterm-viewport),
+.terminal-wrapper :deep(.xterm-screen) {
+  height: 100% !important;
 }
 
 .code-editor {
