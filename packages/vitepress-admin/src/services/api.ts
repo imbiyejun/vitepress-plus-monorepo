@@ -442,6 +442,56 @@ export interface ServerEnvStatus {
   remotePath?: string
 }
 
+// ========== Software Management Types ==========
+export type SoftwareCategory = 'webserver' | 'runtime' | 'database' | 'tool'
+
+export interface SoftwareInfo {
+  id: string
+  name: string
+  description: string
+  icon: string
+  color: string
+  category: SoftwareCategory
+  installed: boolean
+  version?: string
+  configPaths: string[]
+  serviceName?: string
+}
+
+export type SoftwareAction = 'install' | 'uninstall' | 'upgrade'
+
+export interface SoftwareTaskStep {
+  title: string
+  status: InitStepStatus
+  logs: string[]
+  startTime?: number
+  endTime?: number
+}
+
+export interface SoftwareTask {
+  id: string
+  softwareId: string
+  softwareName: string
+  action: SoftwareAction
+  status: 'running' | 'success' | 'error'
+  steps: SoftwareTaskStep[]
+  startTime: number
+  endTime?: number
+  error?: string
+}
+
+export interface SoftwareMessage {
+  type: 'software:progress' | 'software:complete' | 'software:error'
+  taskId: string
+  task: SoftwareTask
+}
+
+export interface SoftwareConfigResult {
+  softwareId: string
+  path: string
+  content: string
+}
+
 // ========== Server API ==========
 export const serverApi = {
   getStatus: () => http.get<ServerStatus>('/server/status'),
@@ -493,5 +543,21 @@ export const serverApi = {
   startInit: (config: ServerInitConfig) =>
     http.post<{ taskId: string }>('/server/init/start', config),
 
-  getInitTask: () => http.get<{ task: InitTask | null }>('/server/init/task')
+  getInitTask: () => http.get<{ task: InitTask | null }>('/server/init/task'),
+
+  // Software management
+  getSoftwareStatus: () => http.get<{ software: SoftwareInfo[] }>('/server/software/status'),
+
+  executeSoftwareAction: (softwareId: string, action: SoftwareAction) =>
+    http.post<{ taskId: string }>('/server/software/action', { softwareId, action }),
+
+  getSoftwareTask: () => http.get<{ task: SoftwareTask | null }>('/server/software/task'),
+
+  getSoftwareConfig: (softwareId: string, configPath: string) =>
+    http.get<SoftwareConfigResult>('/server/software/config', {
+      params: { softwareId, configPath }
+    }),
+
+  updateSoftwareConfig: (softwareId: string, configPath: string, content: string) =>
+    http.put('/server/software/config', { softwareId, configPath, content }, { showSuccess: true })
 }

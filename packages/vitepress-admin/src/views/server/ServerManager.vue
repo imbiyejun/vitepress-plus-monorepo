@@ -171,6 +171,14 @@ DEPLOY_PASSWORD=your_password</pre
               </a-tabs>
             </div>
           </a-tab-pane>
+
+          <a-tab-pane key="deploy" tab="一键部署">
+            <DeployTab />
+          </a-tab-pane>
+
+          <a-tab-pane key="software" tab="软件管理">
+            <SoftwareTab />
+          </a-tab-pane>
         </a-tabs>
       </template>
     </a-spin>
@@ -530,6 +538,8 @@ import { wsService } from '@/services/websocket'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
+import DeployTab from './DeployTab.vue'
+import SoftwareTab from './SoftwareTab.vue'
 
 const loading = ref(false)
 const testingConnection = ref(false)

@@ -17,6 +17,13 @@ import {
   downloadFile
 } from '../controllers/server/index.js'
 import { getEnvStatus, startInit, getInitTask } from '../controllers/server/init.js'
+import {
+  getSoftwareStatus,
+  executeSoftwareAction,
+  getSoftwareTask,
+  getSoftwareConfig,
+  updateSoftwareConfig
+} from '../controllers/server/software.js'
 
 const router: express.Router = express.Router()
 
@@ -52,5 +59,12 @@ router.get('/download', downloadFile)
 router.get('/init/env-status', getEnvStatus)
 router.post('/init/start', startInit)
 router.get('/init/task', getInitTask)
+
+// Software management
+router.get('/software/status', getSoftwareStatus)
+router.post('/software/action', executeSoftwareAction)
+router.get('/software/task', getSoftwareTask)
+router.get('/software/config', getSoftwareConfig)
+router.put('/software/config', updateSoftwareConfig)
 
 export default router

@@ -13,7 +13,8 @@ import { fileWatcher } from './services/watcher.js'
 import { deployService } from './controllers/deploy/index.js'
 import { serverService } from './services/serverService.js'
 import { serverInitService } from './services/serverInitService.js'
-import type { TerminalMessage, InitMessage } from './types/server.js'
+import { softwareService } from './services/softwareService.js'
+import type { TerminalMessage, InitMessage, SoftwareMessage } from './types/server.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getProjectRoot } from './config/paths.js'
@@ -132,6 +133,15 @@ const wss = new WebSocketServer({ server })
 
 // Broadcast init progress to all connected clients
 serverInitService.setBroadcast((message: InitMessage) => {
+  wss.clients.forEach(client => {
+    if (client.readyState === 1) {
+      client.send(JSON.stringify(message))
+    }
+  })
+})
+
+// Broadcast software progress to all connected clients
+softwareService.setBroadcast((message: SoftwareMessage) => {
   wss.clients.forEach(client => {
     if (client.readyState === 1) {
       client.send(JSON.stringify(message))

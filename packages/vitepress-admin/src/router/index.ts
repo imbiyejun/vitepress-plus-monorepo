@@ -83,15 +83,6 @@ const router = createRouter({
           ]
         },
         {
-          path: 'deploy',
-          name: 'deploy',
-          component: () => import('../views/deploy/DeployManager.vue'),
-          meta: {
-            title: '一键部署',
-            icon: 'CloudUploadOutlined'
-          }
-        },
-        {
           path: 'server',
           name: 'server',
           component: () => import('../views/server/ServerManager.vue'),

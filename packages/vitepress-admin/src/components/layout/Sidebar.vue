@@ -72,7 +72,6 @@ import {
   BookOutlined,
   PictureOutlined,
   FileTextOutlined,
-  CloudUploadOutlined,
   CloudServerOutlined
 } from '@ant-design/icons-vue'
 
@@ -115,7 +114,6 @@ const icons = {
   BookOutlined,
   PictureOutlined,
   FileTextOutlined,
-  CloudUploadOutlined,
   CloudServerOutlined
 } as const
 

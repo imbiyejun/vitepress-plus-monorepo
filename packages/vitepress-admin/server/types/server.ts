@@ -152,3 +152,70 @@ export interface CommandResult {
   output: string
   exitCode: number
 }
+
+// Software management types
+
+export type SoftwareCategory = 'webserver' | 'runtime' | 'database' | 'tool'
+
+export interface SoftwareDefinition {
+  id: string
+  name: string
+  description: string
+  icon: string
+  color: string
+  category: SoftwareCategory
+  checkCmd: string
+  versionCmd: string
+  installSteps: Array<{ title: string; cmd: string; timeout?: number }>
+  uninstallSteps: Array<{ title: string; cmd: string; timeout?: number }>
+  upgradeSteps: Array<{ title: string; cmd: string; timeout?: number }>
+  configPaths: string[]
+  serviceName?: string
+}
+
+export interface SoftwareInfo {
+  id: string
+  name: string
+  description: string
+  icon: string
+  color: string
+  category: SoftwareCategory
+  installed: boolean
+  version?: string
+  configPaths: string[]
+  serviceName?: string
+}
+
+export type SoftwareAction = 'install' | 'uninstall' | 'upgrade'
+
+export interface SoftwareTaskStep {
+  title: string
+  status: InitStepStatus
+  logs: string[]
+  startTime?: number
+  endTime?: number
+}
+
+export interface SoftwareTask {
+  id: string
+  softwareId: string
+  softwareName: string
+  action: SoftwareAction
+  status: 'running' | 'success' | 'error'
+  steps: SoftwareTaskStep[]
+  startTime: number
+  endTime?: number
+  error?: string
+}
+
+export interface SoftwareMessage {
+  type: 'software:progress' | 'software:complete' | 'software:error'
+  taskId: string
+  task: SoftwareTask
+}
+
+export interface SoftwareConfigResult {
+  softwareId: string
+  path: string
+  content: string
+}
