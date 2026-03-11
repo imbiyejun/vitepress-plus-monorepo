@@ -116,9 +116,14 @@ const SOFTWARE_REGISTRY: SoftwareDefinition[] = [
       { title: '启用开机自启', cmd: 'systemctl enable mysql' },
       { title: '启动服务', cmd: 'systemctl start mysql' },
       {
-        title: '执行安全初始化',
+        title: '设置 root 密码 (默认: root / root123456)',
         cmd: "mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root123456'; FLUSH PRIVILEGES;\" 2>/dev/null || true",
         timeout: 30000
+      },
+      {
+        title: '验证 MySQL 连接',
+        cmd: "mysql -u root -p'root123456' -e 'SELECT VERSION();' 2>/dev/null && echo '默认账号: root  默认密码: root123456  请在 .env 中添加 DB_USERNAME=root 和 DB_PASSWORD=root123456'",
+        timeout: 10000
       }
     ],
     uninstallSteps: [

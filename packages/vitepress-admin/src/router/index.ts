@@ -90,6 +90,15 @@ const router = createRouter({
             title: '服务器管理',
             icon: 'CloudServerOutlined'
           }
+        },
+        {
+          path: 'database',
+          name: 'database',
+          component: () => import('../views/database/DatabaseManager.vue'),
+          meta: {
+            title: '数据库管理',
+            icon: 'DatabaseOutlined'
+          }
         }
       ]
     },

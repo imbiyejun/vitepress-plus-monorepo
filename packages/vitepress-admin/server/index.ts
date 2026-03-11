@@ -9,6 +9,7 @@ import imageRoutes from './routes/imageRoutes.js'
 import articleRoutes from './routes/articleRoutes.js'
 import deployRoutes from './routes/deployRoutes.js'
 import serverRoutes from './routes/serverRoutes.js'
+import databaseRoutes from './routes/databaseRoutes.js'
 import { fileWatcher } from './services/watcher.js'
 import { deployService } from './controllers/deploy/index.js'
 import { serverService } from './services/serverService.js'
@@ -86,6 +87,7 @@ app.use('/api/images', imageRoutes)
 app.use('/api', articleRoutes)
 app.use('/api/deploy', deployRoutes)
 app.use('/api/server', serverRoutes)
+app.use('/api/database', databaseRoutes)
 
 // Integrate Vite in development mode
 async function setupVite(): Promise<void> {

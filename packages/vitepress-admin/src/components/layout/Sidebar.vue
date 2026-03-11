@@ -72,7 +72,8 @@ import {
   BookOutlined,
   PictureOutlined,
   FileTextOutlined,
-  CloudServerOutlined
+  CloudServerOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons-vue'
 
 interface RouteMeta {
@@ -114,7 +115,8 @@ const icons = {
   BookOutlined,
   PictureOutlined,
   FileTextOutlined,
-  CloudServerOutlined
+  CloudServerOutlined,
+  DatabaseOutlined
 } as const
 
 // 获取图标组件

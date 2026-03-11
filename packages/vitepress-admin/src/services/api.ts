@@ -561,3 +561,73 @@ export const serverApi = {
   updateSoftwareConfig: (softwareId: string, configPath: string, content: string) =>
     http.put('/server/software/config', { softwareId, configPath, content }, { showSuccess: true })
 }
+
+// ========== Database Management Types ==========
+export interface DatabaseStatus {
+  configured: boolean
+  host?: string
+  port?: number
+  username?: string
+}
+
+export interface DatabaseInfo {
+  name: string
+  tables?: number
+}
+
+export interface TableInfo {
+  name: string
+  rows: number | null
+  engine: string | null
+  collation: string | null
+  size: string | null
+  comment: string
+}
+
+export interface ColumnInfo {
+  name: string
+  type: string
+  nullable: boolean
+  key: string
+  defaultValue: string | null
+  extra: string
+}
+
+export interface QueryResult {
+  columns: string[]
+  rows: Record<string, unknown>[]
+  affectedRows: number
+  message: string
+  executionTime: number
+}
+
+// ========== Database API ==========
+export const databaseApi = {
+  getStatus: () => http.get<DatabaseStatus>('/database/status'),
+
+  testConnection: () => http.post<{ connected: boolean }>('/database/test-connection', {}),
+
+  listDatabases: () => http.get<{ databases: DatabaseInfo[] }>('/database/databases'),
+
+  createDatabase: (name: string, charset?: string, collation?: string) =>
+    http.post('/database/databases', { name, charset, collation }, { showSuccess: true }),
+
+  dropDatabase: (name: string) =>
+    http.delete('/database/databases', { data: { name }, showSuccess: true }),
+
+  listTables: (database: string) =>
+    http.get<{ tables: TableInfo[] }>('/database/tables', { params: { database } }),
+
+  getTableColumns: (database: string, table: string) =>
+    http.get<{ columns: ColumnInfo[] }>('/database/columns', { params: { database, table } }),
+
+  executeQuery: (database: string, sql: string) =>
+    http.post<QueryResult>('/database/query', { database, sql }),
+
+  changePassword: (currentUsername: string, currentPassword: string, newPassword: string) =>
+    http.post(
+      '/database/change-password',
+      { currentUsername, currentPassword, newPassword },
+      { showSuccess: true }
+    )
+}
