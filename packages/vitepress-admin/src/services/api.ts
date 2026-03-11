@@ -601,6 +601,36 @@ export interface QueryResult {
   executionTime: number
 }
 
+export interface CreateTableColumn {
+  name: string
+  type: string
+  length?: string
+  nullable?: boolean
+  defaultValue?: string
+  autoIncrement?: boolean
+  primaryKey?: boolean
+  comment?: string
+}
+
+export interface TableDataQuery {
+  database: string
+  table: string
+  page?: number
+  pageSize?: number
+  orderBy?: string
+  orderDir?: 'ASC' | 'DESC'
+  search?: string
+}
+
+export interface TableDataResult {
+  columns: ColumnInfo[]
+  rows: Record<string, unknown>[]
+  total: number
+  page: number
+  pageSize: number
+  primaryKeys: string[]
+}
+
 // ========== Database API ==========
 export const databaseApi = {
   getStatus: () => http.get<DatabaseStatus>('/database/status'),
@@ -628,6 +658,55 @@ export const databaseApi = {
     http.post(
       '/database/change-password',
       { currentUsername, currentPassword, newPassword },
+      { showSuccess: true }
+    ),
+
+  getTableData: (params: TableDataQuery) =>
+    http.get<TableDataResult>('/database/table-data', { params }),
+
+  insertRow: (database: string, table: string, row: Record<string, unknown>) =>
+    http.post<{ success: boolean; affectedRows: number; insertId: number }>('/database/rows', {
+      database,
+      table,
+      row
+    }),
+
+  updateRow: (
+    database: string,
+    table: string,
+    primaryKeyValues: Record<string, unknown>,
+    changes: Record<string, unknown>
+  ) =>
+    http.put<{ success: boolean; affectedRows: number }>('/database/rows', {
+      database,
+      table,
+      primaryKeyValues,
+      changes
+    }),
+
+  deleteRow: (database: string, table: string, primaryKeyValues: Record<string, unknown>) =>
+    http.delete<{ success: boolean; affectedRows: number }>('/database/rows', {
+      data: { database, table, primaryKeyValues }
+    }),
+
+  createTable: (
+    database: string,
+    tableName: string,
+    columns: CreateTableColumn[],
+    engine?: string,
+    charset?: string,
+    comment?: string
+  ) =>
+    http.post(
+      '/database/tables',
+      {
+        database,
+        tableName,
+        columns,
+        engine,
+        charset,
+        comment
+      },
       { showSuccess: true }
     )
 }

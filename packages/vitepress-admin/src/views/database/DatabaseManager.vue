@@ -36,225 +36,179 @@ DB_PASSWORD=root123456</pre
       </template>
 
       <template v-else>
-        <a-tabs v-model:activeKey="activeTab" class="db-tabs">
-          <!-- Database Overview Tab -->
-          <a-tab-pane key="overview" tab="数据库概览">
-            <div class="overview-layout">
-              <div class="db-sidebar">
-                <div class="sidebar-header">
-                  <span class="sidebar-title">数据库列表</span>
-                  <a-space size="small">
-                    <a-button size="small" @click="loadDatabases" :loading="loadingDatabases">
-                      <template #icon><ReloadOutlined /></template>
-                    </a-button>
-                    <a-button size="small" type="primary" @click="showCreateDbModal = true">
-                      <template #icon><PlusOutlined /></template>
-                    </a-button>
-                  </a-space>
-                </div>
-                <a-menu
-                  v-model:selectedKeys="selectedDbKeys"
-                  mode="inline"
-                  class="db-menu"
-                  @click="handleDbSelect"
-                >
-                  <a-menu-item v-for="db in databases" :key="db.name">
-                    <template #icon><DatabaseOutlined /></template>
-                    <span>{{ db.name }}</span>
-                    <a-badge :count="db.tables" :overflow-count="999" class="table-count" />
-                  </a-menu-item>
-                </a-menu>
-              </div>
-
-              <div class="db-main">
-                <template v-if="!selectedDatabase">
-                  <a-empty description="请选择一个数据库" />
-                </template>
-                <template v-else>
-                  <div class="main-toolbar">
-                    <span class="db-name-display">
-                      <DatabaseOutlined /> {{ selectedDatabase }}
-                    </span>
-                    <a-space>
-                      <a-button size="small" @click="loadTables" :loading="loadingTables">
-                        <template #icon><ReloadOutlined /></template>
-                        刷新表
-                      </a-button>
-                      <a-popconfirm
-                        :title="`确定删除数据库 ${selectedDatabase}？此操作不可撤销！`"
-                        @confirm="handleDropDatabase"
-                        ok-text="确定删除"
-                        ok-type="danger"
-                      >
-                        <a-button size="small" danger>
-                          <template #icon><DeleteOutlined /></template>
-                          删除数据库
-                        </a-button>
-                      </a-popconfirm>
-                    </a-space>
-                  </div>
-
-                  <a-table
-                    :dataSource="tables"
-                    :columns="tableColumns"
-                    :loading="loadingTables"
-                    :pagination="false"
-                    rowKey="name"
-                    size="small"
-                    class="tables-list"
-                    @row-click="handleTableClick"
-                  >
-                    <template #bodyCell="{ column, record }">
-                      <template v-if="column.key === 'name'">
-                        <a @click.prevent="handleTableClick(record)">
-                          <TableOutlined /> {{ record.name }}
-                        </a>
-                      </template>
-                      <template v-else-if="column.key === 'rows'">
-                        {{ record.rows ?? '-' }}
-                      </template>
-                    </template>
-                  </a-table>
-                </template>
-              </div>
-            </div>
-          </a-tab-pane>
-
-          <!-- SQL Query Tab -->
-          <a-tab-pane key="query" tab="SQL 查询">
-            <div class="query-layout">
-              <div class="query-toolbar">
-                <a-select
-                  v-model:value="queryDatabase"
-                  placeholder="选择数据库"
-                  style="width: 200px"
-                  :options="databases.map(d => ({ value: d.name, label: d.name }))"
-                />
-                <a-button
-                  type="primary"
-                  :loading="executing"
-                  :disabled="!queryDatabase || !sqlContent.trim()"
-                  @click="handleExecuteQuery"
-                >
-                  <template #icon><CaretRightOutlined /></template>
-                  执行
+        <div class="db-workspace">
+          <!-- Left: Tree sidebar -->
+          <div class="db-sidebar">
+            <div class="sidebar-header">
+              <span class="sidebar-title">数据库</span>
+              <a-space size="small">
+                <a-button size="small" @click="loadDatabases" :loading="loadingDatabases">
+                  <template #icon><ReloadOutlined /></template>
                 </a-button>
-                <span v-if="queryResult" class="query-stats">
-                  <a-tag v-if="queryResult.rows.length > 0" color="blue">
-                    {{ queryResult.rows.length }} 行
-                  </a-tag>
-                  <a-tag v-if="queryResult.affectedRows > 0" color="green">
-                    影响 {{ queryResult.affectedRows }} 行
-                  </a-tag>
-                  <a-tag color="default">{{ queryResult.executionTime }}ms</a-tag>
-                </span>
-              </div>
-
-              <a-textarea
-                v-model:value="sqlContent"
-                placeholder="输入 SQL 语句..."
-                :auto-size="{ minRows: 6, maxRows: 12 }"
-                class="sql-editor"
-                @keydown.ctrl.enter="handleExecuteQuery"
-              />
-
-              <div class="query-result-area" v-if="queryResult">
-                <div class="result-message">{{ queryResult.message }}</div>
-                <a-table
-                  v-if="queryResult.rows.length > 0"
-                  :dataSource="queryResult.rows"
-                  :columns="queryResultColumns"
-                  :pagination="{ pageSize: 50 }"
-                  :scroll="{ x: 'max-content' }"
-                  rowKey="_rowIndex"
-                  size="small"
-                  bordered
-                  class="result-table"
-                />
-              </div>
-
-              <a-alert
-                v-if="queryError"
-                :message="queryError"
-                type="error"
+                <a-button size="small" type="primary" @click="showCreateDbModal = true">
+                  <template #icon><PlusOutlined /></template>
+                </a-button>
+              </a-space>
+            </div>
+            <div class="tree-wrap">
+              <a-tree
+                v-if="treeData.length > 0"
+                :tree-data="treeData"
+                :load-data="onLoadTreeData"
+                :selectedKeys="selectedTreeKeys"
+                :expandedKeys="expandedKeys"
+                block-node
                 show-icon
-                closable
-                style="margin-top: 12px"
-                @close="queryError = ''"
-              />
+                @select="onTreeSelect"
+                @expand="onTreeExpand"
+              >
+                <template #icon="{ dataRef }">
+                  <DatabaseOutlined v-if="dataRef.type === 'database'" />
+                  <TableOutlined v-else-if="dataRef.type === 'table'" />
+                </template>
+                <template #title="{ dataRef }">
+                  <div class="tree-node-title">
+                    <span class="tree-node-name">{{ dataRef.title }}</span>
+                    <a-badge
+                      v-if="dataRef.type === 'database' && dataRef.tableCount != null"
+                      :count="dataRef.tableCount"
+                      :overflow-count="999"
+                      class="tree-badge"
+                    />
+                    <a-dropdown v-if="dataRef.type === 'database'" :trigger="['click']" @click.stop>
+                      <span class="tree-node-action" @click.stop>
+                        <EllipsisOutlined />
+                      </span>
+                      <template #overlay>
+                        <a-menu>
+                          <a-menu-item
+                            key="create-table"
+                            @click="openCreateTableModal(dataRef.key as string)"
+                          >
+                            <PlusOutlined /> 新建表
+                          </a-menu-item>
+                          <a-menu-item key="new-query" @click="openQueryTab(dataRef.key as string)">
+                            <CodeOutlined /> 新建查询
+                          </a-menu-item>
+                          <a-menu-divider />
+                          <a-menu-item
+                            key="drop"
+                            danger
+                            @click="handleDropDatabase(dataRef.key as string)"
+                          >
+                            <DeleteOutlined /> 删除数据库
+                          </a-menu-item>
+                        </a-menu>
+                      </template>
+                    </a-dropdown>
+                  </div>
+                </template>
+              </a-tree>
+              <a-empty v-else-if="!loadingDatabases" description="暂无数据库" />
             </div>
-          </a-tab-pane>
+          </div>
 
-          <!-- Account Management Tab -->
-          <a-tab-pane key="account" tab="账号管理">
-            <div class="account-layout">
-              <a-card title="当前连接信息" size="small" style="margin-bottom: 16px">
-                <a-descriptions :column="2" size="small">
-                  <a-descriptions-item label="主机">{{ dbStatus.host }}</a-descriptions-item>
-                  <a-descriptions-item label="端口">{{ dbStatus.port }}</a-descriptions-item>
-                  <a-descriptions-item label="用户名">{{ dbStatus.username }}</a-descriptions-item>
-                </a-descriptions>
-              </a-card>
+          <!-- Right: Content area with tabs -->
+          <div class="db-content">
+            <a-tabs
+              v-model:activeKey="activeTab"
+              class="content-tabs"
+              type="editable-card"
+              @edit="onTabEdit"
+            >
+              <!-- Dynamic tabs: table viewers + SQL queries -->
+              <a-tab-pane v-for="tab in openTabs" :key="tab.key" :closable="tab.closable !== false">
+                <template #tab>
+                  <span>
+                    <TableOutlined v-if="tab.type === 'table'" />
+                    <CodeOutlined v-else-if="tab.type === 'query'" />
+                    <SettingOutlined v-else-if="tab.type === 'account'" />
+                    {{ tab.title }}
+                  </span>
+                </template>
 
-              <a-card title="MySQL 默认凭据" size="small" style="margin-bottom: 16px">
-                <a-alert
-                  message="通过软件管理安装 MySQL 后，默认凭据如下："
-                  type="info"
-                  show-icon
-                  style="margin-bottom: 12px"
+                <TableDataViewer
+                  v-if="tab.type === 'table'"
+                  :database="tab.database"
+                  :table="tab.tableName!"
                 />
-                <a-descriptions :column="1" size="small" bordered>
-                  <a-descriptions-item label="默认用户名">root</a-descriptions-item>
-                  <a-descriptions-item label="默认密码">root123456</a-descriptions-item>
-                </a-descriptions>
-              </a-card>
 
-              <a-card title="修改密码" size="small">
-                <a-form
-                  :model="passwordForm"
-                  :label-col="{ span: 6 }"
-                  :wrapper-col="{ span: 16 }"
-                  @finish="handleChangePassword"
-                >
-                  <a-form-item
-                    label="用户名"
-                    name="currentUsername"
-                    :rules="[{ required: true, message: '请输入用户名' }]"
-                  >
-                    <a-input v-model:value="passwordForm.currentUsername" placeholder="root" />
-                  </a-form-item>
-                  <a-form-item
-                    label="当前密码"
-                    name="currentPassword"
-                    :rules="[{ required: true, message: '请输入当前密码' }]"
-                  >
-                    <a-input-password v-model:value="passwordForm.currentPassword" />
-                  </a-form-item>
-                  <a-form-item
-                    label="新密码"
-                    name="newPassword"
-                    :rules="[{ required: true, message: '请输入新密码' }]"
-                  >
-                    <a-input-password v-model:value="passwordForm.newPassword" />
-                  </a-form-item>
-                  <a-form-item label="确认密码" name="confirmPassword" :rules="confirmRules">
-                    <a-input-password v-model:value="passwordForm.confirmPassword" />
-                  </a-form-item>
-                  <a-form-item :wrapper-col="{ offset: 6, span: 16 }">
-                    <a-button type="primary" html-type="submit" :loading="changingPassword">
-                      修改密码
-                    </a-button>
-                  </a-form-item>
-                </a-form>
-                <a-alert
-                  message="修改密码后请记得同步更新 .env 文件中的 DB_PASSWORD"
-                  type="warning"
-                  show-icon
+                <SqlQueryTab
+                  v-else-if="tab.type === 'query'"
+                  :databaseOptions="databaseOptions"
+                  :initialDatabase="tab.database"
                 />
-              </a-card>
-            </div>
-          </a-tab-pane>
-        </a-tabs>
+
+                <div v-else-if="tab.type === 'account'" class="account-layout">
+                  <a-card title="当前连接信息" size="small" style="margin-bottom: 16px">
+                    <a-descriptions :column="2" size="small">
+                      <a-descriptions-item label="主机">{{ dbStatus.host }}</a-descriptions-item>
+                      <a-descriptions-item label="端口">{{ dbStatus.port }}</a-descriptions-item>
+                      <a-descriptions-item label="用户名">{{
+                        dbStatus.username
+                      }}</a-descriptions-item>
+                    </a-descriptions>
+                  </a-card>
+                  <a-card title="MySQL 默认凭据" size="small" style="margin-bottom: 16px">
+                    <a-alert
+                      message="通过软件管理安装 MySQL 后，默认凭据如下："
+                      type="info"
+                      show-icon
+                      style="margin-bottom: 12px"
+                    />
+                    <a-descriptions :column="1" size="small" bordered>
+                      <a-descriptions-item label="默认用户名">root</a-descriptions-item>
+                      <a-descriptions-item label="默认密码">root123456</a-descriptions-item>
+                    </a-descriptions>
+                  </a-card>
+                  <a-card title="修改密码" size="small">
+                    <a-form
+                      :model="passwordForm"
+                      :label-col="{ span: 6 }"
+                      :wrapper-col="{ span: 16 }"
+                      @finish="handleChangePassword"
+                    >
+                      <a-form-item
+                        label="用户名"
+                        name="currentUsername"
+                        :rules="[{ required: true, message: '请输入用户名' }]"
+                      >
+                        <a-input v-model:value="passwordForm.currentUsername" placeholder="root" />
+                      </a-form-item>
+                      <a-form-item
+                        label="当前密码"
+                        name="currentPassword"
+                        :rules="[{ required: true, message: '请输入当前密码' }]"
+                      >
+                        <a-input-password v-model:value="passwordForm.currentPassword" />
+                      </a-form-item>
+                      <a-form-item
+                        label="新密码"
+                        name="newPassword"
+                        :rules="[{ required: true, message: '请输入新密码' }]"
+                      >
+                        <a-input-password v-model:value="passwordForm.newPassword" />
+                      </a-form-item>
+                      <a-form-item label="确认密码" name="confirmPassword" :rules="confirmRules">
+                        <a-input-password v-model:value="passwordForm.confirmPassword" />
+                      </a-form-item>
+                      <a-form-item :wrapper-col="{ offset: 6, span: 16 }">
+                        <a-button type="primary" html-type="submit" :loading="changingPassword">
+                          修改密码
+                        </a-button>
+                      </a-form-item>
+                    </a-form>
+                    <a-alert
+                      message="修改密码后请记得同步更新 .env 文件中的 DB_PASSWORD"
+                      type="warning"
+                      show-icon
+                    />
+                  </a-card>
+                </div>
+              </a-tab-pane>
+            </a-tabs>
+          </div>
+        </div>
       </template>
     </a-spin>
 
@@ -279,44 +233,118 @@ DB_PASSWORD=root123456</pre
       </a-form>
     </a-modal>
 
-    <!-- Table Structure Modal -->
+    <!-- Create Table Modal -->
     <a-modal
-      v-model:open="showColumnsModal"
-      :title="`表结构 - ${viewingTable}`"
-      width="700px"
-      :footer="null"
+      v-model:open="showCreateTableModal"
+      title="新建表"
+      width="860px"
+      @ok="handleCreateTable"
+      :confirmLoading="creatingTable"
+      okText="创建"
+      destroyOnClose
     >
-      <a-table
-        :dataSource="tableColumnsData"
-        :columns="columnInfoColumns"
-        :loading="loadingColumns"
-        :pagination="false"
-        rowKey="name"
-        size="small"
-        bordered
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'key'">
-            <a-tag v-if="record.key === 'PRI'" color="gold">PRI</a-tag>
-            <a-tag v-else-if="record.key === 'UNI'" color="blue">UNI</a-tag>
-            <a-tag v-else-if="record.key === 'MUL'" color="green">MUL</a-tag>
-            <span v-else>-</span>
+      <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 19 }" style="margin-bottom: 16px">
+        <a-form-item label="目标数据库">
+          <a-tag color="blue">{{ createTableDatabase }}</a-tag>
+        </a-form-item>
+        <a-form-item label="表名" required>
+          <a-input v-model:value="newTableName" placeholder="table_name" />
+        </a-form-item>
+        <a-row :gutter="12">
+          <a-col :span="8">
+            <a-form-item label="引擎" :label-col="{ span: 8 }" :wrapper-col="{ span: 16 }">
+              <a-select v-model:value="newTableEngine" style="width: 100%">
+                <a-select-option value="InnoDB">InnoDB</a-select-option>
+                <a-select-option value="MyISAM">MyISAM</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="字符集" :label-col="{ span: 8 }" :wrapper-col="{ span: 16 }">
+              <a-select v-model:value="newTableCharset" style="width: 100%">
+                <a-select-option value="utf8mb4">utf8mb4</a-select-option>
+                <a-select-option value="utf8">utf8</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="备注" :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
+              <a-input v-model:value="newTableComment" placeholder="可选" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+
+      <div class="create-table-columns">
+        <div class="columns-header">
+          <span>列定义</span>
+          <a-button size="small" type="primary" @click="addColumn">
+            <template #icon><PlusOutlined /></template>
+            添加列
+          </a-button>
+        </div>
+        <a-table
+          :dataSource="newTableColumns"
+          :columns="createTableColumnDefs"
+          :pagination="false"
+          size="small"
+          bordered
+          rowKey="_idx"
+        >
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'name'">
+              <a-input v-model:value="record.name" size="small" placeholder="列名" />
+            </template>
+            <template v-else-if="column.key === 'type'">
+              <a-auto-complete
+                v-model:value="record.type"
+                size="small"
+                :options="mysqlTypes"
+                placeholder="INT"
+                style="width: 100%"
+              />
+            </template>
+            <template v-else-if="column.key === 'length'">
+              <a-input v-model:value="record.length" size="small" placeholder="长度" />
+            </template>
+            <template v-else-if="column.key === 'nullable'">
+              <a-checkbox v-model:checked="record.nullable" />
+            </template>
+            <template v-else-if="column.key === 'primaryKey'">
+              <a-checkbox v-model:checked="record.primaryKey" />
+            </template>
+            <template v-else-if="column.key === 'autoIncrement'">
+              <a-checkbox v-model:checked="record.autoIncrement" />
+            </template>
+            <template v-else-if="column.key === 'defaultValue'">
+              <a-input v-model:value="record.defaultValue" size="small" placeholder="默认值" />
+            </template>
+            <template v-else-if="column.key === 'comment'">
+              <a-input v-model:value="record.comment" size="small" placeholder="备注" />
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-button
+                size="small"
+                type="link"
+                danger
+                :disabled="newTableColumns.length <= 1"
+                @click="removeColumn(index)"
+              >
+                <template #icon><DeleteOutlined /></template>
+              </a-button>
+            </template>
           </template>
-          <template v-else-if="column.key === 'nullable'">
-            <a-tag :color="record.nullable ? 'default' : 'red'">
-              {{ record.nullable ? 'YES' : 'NO' }}
-            </a-tag>
-          </template>
-        </template>
-      </a-table>
+        </a-table>
+      </div>
     </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
+import type { TreeProps } from 'ant-design-vue'
 import {
   ApiOutlined,
   ReloadOutlined,
@@ -324,29 +352,59 @@ import {
   DeleteOutlined,
   DatabaseOutlined,
   TableOutlined,
-  CaretRightOutlined
+  CodeOutlined,
+  SettingOutlined,
+  EllipsisOutlined
 } from '@ant-design/icons-vue'
 import {
   databaseApi,
   type DatabaseStatus as DbStatus,
   type DatabaseInfo,
-  type TableInfo,
-  type ColumnInfo,
-  type QueryResult
+  type CreateTableColumn
 } from '@/services/api'
+import TableDataViewer from './TableDataViewer.vue'
+import SqlQueryTab from './SqlQueryTab.vue'
+
+interface TreeNode {
+  key: string
+  title: string
+  type: 'database' | 'table'
+  isLeaf?: boolean
+  children?: TreeNode[]
+  tableCount?: number
+}
+
+interface TabItem {
+  key: string
+  title: string
+  type: 'table' | 'query' | 'account'
+  database: string
+  tableName?: string
+  closable?: boolean
+}
+
+interface NewColumnRow extends CreateTableColumn {
+  _idx: number
+}
 
 const loading = ref(false)
 const testingConnection = ref(false)
-const activeTab = ref('overview')
 const dbStatus = ref<DbStatus>({ configured: false })
 
-// Overview state
+// Tree state
 const databases = ref<DatabaseInfo[]>([])
 const loadingDatabases = ref(false)
-const selectedDbKeys = ref<string[]>([])
-const selectedDatabase = computed(() => selectedDbKeys.value[0] || '')
-const tables = ref<TableInfo[]>([])
-const loadingTables = ref(false)
+const treeData = ref<TreeNode[]>([])
+const selectedTreeKeys = ref<string[]>([])
+const expandedKeys = ref<string[]>([])
+
+// Tabs state
+let queryTabCounter = 0
+const activeTab = ref('__query_0')
+const openTabs = ref<TabItem[]>([
+  { key: '__query_0', title: 'SQL 查询', type: 'query', database: '', closable: false },
+  { key: '__account', title: '账号管理', type: 'account', database: '', closable: false }
+])
 
 // Create database
 const showCreateDbModal = ref(false)
@@ -354,18 +412,16 @@ const newDbName = ref('')
 const newDbCharset = ref('utf8mb4')
 const creatingDb = ref(false)
 
-// Table columns
-const showColumnsModal = ref(false)
-const viewingTable = ref('')
-const tableColumnsData = ref<ColumnInfo[]>([])
-const loadingColumns = ref(false)
-
-// SQL Query state
-const queryDatabase = ref<string>('')
-const sqlContent = ref('')
-const executing = ref(false)
-const queryResult = ref<QueryResult | null>(null)
-const queryError = ref('')
+// Create table
+const showCreateTableModal = ref(false)
+const createTableDatabase = ref('')
+const newTableName = ref('')
+const newTableEngine = ref('InnoDB')
+const newTableCharset = ref('utf8mb4')
+const newTableComment = ref('')
+const creatingTable = ref(false)
+let columnIdxCounter = 0
+const newTableColumns = ref<NewColumnRow[]>([makeDefaultColumn()])
 
 // Account state
 const changingPassword = ref(false)
@@ -388,34 +444,167 @@ const confirmRules: Rule[] = [
   }
 ]
 
-const tableColumns = [
-  { title: '表名', key: 'name', dataIndex: 'name' },
-  { title: '行数', key: 'rows', dataIndex: 'rows', width: 100 },
-  { title: '引擎', dataIndex: 'engine', width: 100 },
-  { title: '大小', dataIndex: 'size', width: 100 },
-  { title: '排序规则', dataIndex: 'collation', width: 180 },
-  { title: '备注', dataIndex: 'comment', ellipsis: true }
+const databaseOptions = computed(() => databases.value.map(d => ({ value: d.name, label: d.name })))
+
+const mysqlTypes = [
+  'INT',
+  'BIGINT',
+  'TINYINT',
+  'SMALLINT',
+  'MEDIUMINT',
+  'VARCHAR',
+  'CHAR',
+  'TEXT',
+  'MEDIUMTEXT',
+  'LONGTEXT',
+  'DECIMAL',
+  'FLOAT',
+  'DOUBLE',
+  'DATE',
+  'DATETIME',
+  'TIMESTAMP',
+  'TIME',
+  'YEAR',
+  'BLOB',
+  'MEDIUMBLOB',
+  'LONGBLOB',
+  'JSON',
+  'ENUM',
+  'SET',
+  'BOOLEAN'
+].map(t => ({ value: t }))
+
+const createTableColumnDefs = [
+  { title: '列名', key: 'name', width: 130 },
+  { title: '类型', key: 'type', width: 120 },
+  { title: '长度', key: 'length', width: 70 },
+  { title: '可空', key: 'nullable', width: 50, align: 'center' as const },
+  { title: '主键', key: 'primaryKey', width: 50, align: 'center' as const },
+  { title: '自增', key: 'autoIncrement', width: 50, align: 'center' as const },
+  { title: '默认值', key: 'defaultValue', width: 100 },
+  { title: '备注', key: 'comment', width: 120 },
+  { title: '', key: 'actions', width: 50 }
 ]
 
-const columnInfoColumns = [
-  { title: '列名', dataIndex: 'name', key: 'name' },
-  { title: '类型', dataIndex: 'type', key: 'type' },
-  { title: '可空', dataIndex: 'nullable', key: 'nullable', width: 80 },
-  { title: '键', dataIndex: 'key', key: 'key', width: 60 },
-  { title: '默认值', dataIndex: 'defaultValue', key: 'defaultValue', width: 120 },
-  { title: '额外', dataIndex: 'extra', key: 'extra', width: 150 }
-]
+function makeDefaultColumn(): NewColumnRow {
+  return {
+    _idx: columnIdxCounter++,
+    name: '',
+    type: 'VARCHAR',
+    length: '255',
+    nullable: true,
+    primaryKey: false,
+    autoIncrement: false,
+    defaultValue: '',
+    comment: ''
+  }
+}
 
-const queryResultColumns = computed(() => {
-  if (!queryResult.value) return []
-  return queryResult.value.columns.map(col => ({
-    title: col,
-    dataIndex: col,
-    key: col,
-    ellipsis: true,
-    width: 150
+function addColumn() {
+  newTableColumns.value.push(makeDefaultColumn())
+}
+
+function removeColumn(index: number) {
+  newTableColumns.value.splice(index, 1)
+}
+
+// Build tree from databases list
+function buildTree(dbs: DatabaseInfo[]): TreeNode[] {
+  return dbs.map(db => ({
+    key: db.name,
+    title: db.name,
+    type: 'database' as const,
+    isLeaf: false,
+    tableCount: db.tables,
+    children: undefined
   }))
-})
+}
+
+// Lazy load tables when expanding a database node
+const onLoadTreeData: TreeProps['loadData'] = async treeNode => {
+  const node = treeNode.dataRef as unknown as TreeNode
+  if (node.children) return
+  try {
+    const { tables } = await databaseApi.listTables(node.key)
+    node.children = tables.map(t => ({
+      key: `${node.key}::${t.name}`,
+      title: t.name,
+      type: 'table' as const,
+      isLeaf: true
+    }))
+    treeData.value = [...treeData.value]
+  } catch {
+    message.error('加载表列表失败')
+  }
+}
+
+function onTreeExpand(keys: string[]) {
+  expandedKeys.value = keys
+}
+
+function onTreeSelect(keys: string[], info: { node: { dataRef: unknown } }) {
+  selectedTreeKeys.value = keys as string[]
+  const node = info.node.dataRef as unknown as TreeNode
+  if (node.type === 'table') {
+    const [database, tableName] = node.key.split('::')
+    openTableTab(database, tableName)
+  } else if (node.type === 'database') {
+    if (!expandedKeys.value.includes(node.key)) {
+      expandedKeys.value = [...expandedKeys.value, node.key]
+    }
+  }
+}
+
+function openTableTab(database: string, tableName: string) {
+  const tabKey = `table::${database}::${tableName}`
+  const existing = openTabs.value.find(t => t.key === tabKey)
+  if (existing) {
+    activeTab.value = tabKey
+    return
+  }
+  // Insert before fixed tabs
+  const fixedIdx = openTabs.value.findIndex(t => t.closable === false)
+  const insertIdx = fixedIdx >= 0 ? fixedIdx : openTabs.value.length
+  openTabs.value.splice(insertIdx, 0, {
+    key: tabKey,
+    title: tableName,
+    type: 'table',
+    database,
+    tableName
+  })
+  activeTab.value = tabKey
+}
+
+function openQueryTab(database?: string) {
+  queryTabCounter++
+  const tabKey = `__query_${queryTabCounter}`
+  const fixedIdx = openTabs.value.findIndex(t => t.closable === false)
+  const insertIdx = fixedIdx >= 0 ? fixedIdx : openTabs.value.length
+  openTabs.value.splice(insertIdx, 0, {
+    key: tabKey,
+    title: `SQL 查询 ${queryTabCounter}`,
+    type: 'query',
+    database: database || ''
+  })
+  activeTab.value = tabKey
+}
+
+function onTabEdit(targetKey: string | MouseEvent, action: string) {
+  if (action === 'add') {
+    openQueryTab()
+  } else if (action === 'remove' && typeof targetKey === 'string') {
+    const tab = openTabs.value.find(t => t.key === targetKey)
+    if (tab && tab.closable === false) return
+    const idx = openTabs.value.findIndex(t => t.key === targetKey)
+    if (idx !== -1) {
+      openTabs.value.splice(idx, 1)
+      if (activeTab.value === targetKey) {
+        const prev = openTabs.value[Math.max(0, idx - 1)]
+        activeTab.value = prev ? prev.key : openTabs.value[0]?.key || ''
+      }
+    }
+  }
+}
 
 const loadStatus = async () => {
   loading.value = true
@@ -444,49 +633,41 @@ const handleTestConnection = async () => {
   }
 }
 
+// Reload tree and restore previously expanded nodes
 const loadDatabases = async () => {
   loadingDatabases.value = true
+  const prevExpanded = [...expandedKeys.value]
   try {
     const { databases: dbs } = await databaseApi.listDatabases()
     databases.value = dbs
+    const tree = buildTree(dbs)
+
+    // Re-load tables for previously expanded databases
+    await Promise.all(
+      prevExpanded.map(async key => {
+        const node = tree.find(n => n.key === key)
+        if (!node) return
+        try {
+          const { tables } = await databaseApi.listTables(key)
+          node.children = tables.map(t => ({
+            key: `${key}::${t.name}`,
+            title: t.name,
+            type: 'table' as const,
+            isLeaf: true
+          }))
+          node.tableCount = tables.length
+        } catch {
+          /* ignore individual failures */
+        }
+      })
+    )
+
+    treeData.value = tree
+    expandedKeys.value = prevExpanded.filter(k => tree.some(n => n.key === k))
   } catch (error) {
     console.error('Failed to load databases:', error)
   } finally {
     loadingDatabases.value = false
-  }
-}
-
-const handleDbSelect = (info: { key: string }) => {
-  selectedDbKeys.value = [info.key]
-  queryDatabase.value = info.key
-  loadTables()
-}
-
-const loadTables = async () => {
-  if (!selectedDatabase.value) return
-  loadingTables.value = true
-  try {
-    const { tables: tbs } = await databaseApi.listTables(selectedDatabase.value)
-    tables.value = tbs
-  } catch (error) {
-    console.error('Failed to load tables:', error)
-  } finally {
-    loadingTables.value = false
-  }
-}
-
-const handleTableClick = async (record: TableInfo) => {
-  viewingTable.value = record.name
-  showColumnsModal.value = true
-  loadingColumns.value = true
-  try {
-    const { columns } = await databaseApi.getTableColumns(selectedDatabase.value, record.name)
-    tableColumnsData.value = columns
-  } catch (error) {
-    console.error('Failed to load columns:', error)
-    message.error('获取表结构失败')
-  } finally {
-    loadingColumns.value = false
   }
 }
 
@@ -508,32 +689,96 @@ const handleCreateDatabase = async () => {
   }
 }
 
-const handleDropDatabase = async () => {
-  if (!selectedDatabase.value) return
-  try {
-    await databaseApi.dropDatabase(selectedDatabase.value)
-    selectedDbKeys.value = []
-    tables.value = []
-    await loadDatabases()
-  } catch (error) {
-    console.error('Drop database failed:', error)
-  }
+const handleDropDatabase = (dbName: string) => {
+  Modal.confirm({
+    title: '删除数据库',
+    content: `确定删除数据库 "${dbName}"？此操作不可撤销！`,
+    okText: '确定删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await databaseApi.dropDatabase(dbName)
+        openTabs.value = openTabs.value.filter(t => t.closable === false || t.database !== dbName)
+        await loadDatabases()
+      } catch (error) {
+        console.error('Drop database failed:', error)
+      }
+    }
+  })
 }
 
-const handleExecuteQuery = async () => {
-  if (!queryDatabase.value || !sqlContent.value.trim()) return
-  executing.value = true
-  queryError.value = ''
-  queryResult.value = null
+function openCreateTableModal(database: string) {
+  createTableDatabase.value = database
+  newTableName.value = ''
+  newTableEngine.value = 'InnoDB'
+  newTableCharset.value = 'utf8mb4'
+  newTableComment.value = ''
+  columnIdxCounter = 0
+  newTableColumns.value = [
+    {
+      _idx: columnIdxCounter++,
+      name: 'id',
+      type: 'INT',
+      length: '',
+      nullable: false,
+      primaryKey: true,
+      autoIncrement: true,
+      defaultValue: '',
+      comment: '主键'
+    },
+    makeDefaultColumn()
+  ]
+  showCreateTableModal.value = true
+}
+
+const handleCreateTable = async () => {
+  if (!newTableName.value.trim()) {
+    message.warning('请输入表名')
+    return
+  }
+  const validColumns = newTableColumns.value.filter(c => c.name.trim() && c.type.trim())
+  if (validColumns.length === 0) {
+    message.warning('请至少添加一个有效的列')
+    return
+  }
+  creatingTable.value = true
   try {
-    const result = await databaseApi.executeQuery(queryDatabase.value, sqlContent.value.trim())
-    // Add row index for table key
-    result.rows = result.rows.map((row, idx) => ({ ...row, _rowIndex: idx }))
-    queryResult.value = result
+    await databaseApi.createTable(
+      createTableDatabase.value,
+      newTableName.value.trim(),
+      validColumns.map(({ _idx, ...col }) => col),
+      newTableEngine.value,
+      newTableCharset.value,
+      newTableComment.value
+    )
+    showCreateTableModal.value = false
+    // Reload the database tree to reflect the new table
+    const node = treeData.value.find(n => n.key === createTableDatabase.value)
+    if (node) {
+      node.children = undefined
+      if (expandedKeys.value.includes(createTableDatabase.value)) {
+        try {
+          const { tables } = await databaseApi.listTables(createTableDatabase.value)
+          node.children = tables.map(t => ({
+            key: `${createTableDatabase.value}::${t.name}`,
+            title: t.name,
+            type: 'table' as const,
+            isLeaf: true
+          }))
+          node.tableCount = tables.length
+          treeData.value = [...treeData.value]
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    message.success('表创建成功')
   } catch (error) {
-    queryError.value = error instanceof Error ? error.message : '查询执行失败'
+    const msg = error instanceof Error ? error.message : '创建表失败'
+    message.error(msg)
   } finally {
-    executing.value = false
+    creatingTable.value = false
   }
 }
 
@@ -604,53 +849,24 @@ onMounted(() => {
   white-space: pre-wrap;
 }
 
-.db-tabs {
+/* Workspace */
+.db-workspace {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  background: #fff;
-  padding: 16px;
-  border-radius: 8px;
+  gap: 12px;
   min-height: 0;
   overflow: hidden;
 }
 
-.db-tabs :deep(.ant-tabs-content-holder) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.db-tabs :deep(.ant-tabs-content) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.db-tabs :deep(.ant-tabs-tabpane) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* Overview layout */
-.overview-layout {
-  flex: 1;
-  display: flex;
-  gap: 16px;
-  min-height: 0;
-}
-
+/* Sidebar */
 .db-sidebar {
-  width: 240px;
+  width: 260px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid #f0f0f0;
   border-radius: 6px;
+  background: #fff;
   overflow: hidden;
 }
 
@@ -661,6 +877,7 @@ onMounted(() => {
   padding: 10px 12px;
   background: #fafafa;
   border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
 }
 
 .sidebar-title {
@@ -668,137 +885,131 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.db-menu {
+.tree-wrap {
   flex: 1;
   overflow-y: auto;
-  border-inline-end: none !important;
+  padding: 4px 0;
 }
 
-.db-menu :deep(.ant-menu-item) {
+.tree-wrap :deep(.ant-tree) {
+  background: transparent;
+}
+
+.tree-wrap :deep(.ant-tree-node-content-wrapper) {
   display: flex;
   align-items: center;
-}
-
-.table-count {
-  margin-left: auto;
-}
-
-.table-count :deep(.ant-badge-count) {
-  font-size: 11px;
-  min-width: 18px;
-  height: 18px;
-  line-height: 18px;
-  background: #e6f4ff;
-  color: #1890ff;
-  box-shadow: none;
-}
-
-.db-main {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   min-width: 0;
-  min-height: 0;
 }
 
-.main-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: #fafafa;
-  border-radius: 6px;
-  margin-bottom: 12px;
-}
-
-.db-name-display {
-  font-weight: 500;
-  font-size: 14px;
-  color: #1890ff;
-}
-
-.tables-list {
-  flex: 1;
-  overflow: auto;
-}
-
-.tables-list :deep(.ant-table-row) {
-  cursor: pointer;
-}
-
-/* SQL Query layout */
-.query-layout {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.query-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-shrink: 0;
-}
-
-.query-stats {
+.tree-node-title {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
-}
-
-.sql-editor {
-  font-family: 'Fira Code', Consolas, Monaco, 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  border: none;
-  resize: none;
-  border-radius: 6px;
-  flex-shrink: 0;
-}
-
-.sql-editor:focus {
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-}
-
-.query-result-area {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  margin-top: 12px;
-  min-height: 0;
-  overflow: auto;
+  min-width: 0;
 }
 
-.result-message {
-  font-size: 13px;
-  color: #52c41a;
-  margin-bottom: 8px;
-  flex-shrink: 0;
-}
-
-.result-table {
-  flex: 1;
-}
-
-.result-table :deep(.ant-table) {
-  font-size: 12px;
-}
-
-.result-table :deep(.ant-table-cell) {
-  padding: 4px 8px !important;
-  max-width: 300px;
+.tree-node-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.tree-badge :deep(.ant-badge-count) {
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  background: #e6f4ff;
+  color: #1890ff;
+  box-shadow: none;
+}
+
+.tree-node-action {
+  margin-left: auto;
+  padding: 0 4px;
+  cursor: pointer;
+  color: #999;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.tree-wrap :deep(.ant-tree-treenode:hover) .tree-node-action {
+  opacity: 1;
+}
+
+.tree-node-action:hover {
+  color: #1890ff;
+}
+
+/* Right content */
+.db-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+}
+
+.content-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 12px;
+}
+
+.content-tabs :deep(.ant-tabs-content-holder) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.content-tabs :deep(.ant-tabs-content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.content-tabs :deep(.ant-tabs-tabpane) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 /* Account layout */
 .account-layout {
   max-width: 700px;
+  overflow-y: auto;
+}
+
+/* Create table modal */
+.create-table-columns {
+  margin-top: 8px;
+}
+
+.columns-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.create-table-columns :deep(.ant-table-cell) {
+  padding: 4px 6px !important;
+}
+
+.create-table-columns :deep(.ant-input),
+.create-table-columns :deep(.ant-select) {
+  font-size: 12px;
 }
 </style>

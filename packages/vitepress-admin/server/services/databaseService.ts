@@ -7,7 +7,9 @@ import type {
   DatabaseInfo,
   TableInfo,
   ColumnInfo,
-  QueryResult
+  QueryResult,
+  TableDataResult,
+  CreateTableColumn
 } from '../types/database.js'
 import { serverService } from './serverService.js'
 
@@ -218,6 +220,164 @@ class DatabaseService {
     return this.withConnection(async conn => {
       await conn.query(`DROP DATABASE \`${name}\``)
     })
+  }
+
+  async createTable(
+    database: string,
+    tableName: string,
+    columns: CreateTableColumn[],
+    engine = 'InnoDB',
+    charset = 'utf8mb4',
+    comment = ''
+  ): Promise<void> {
+    return this.withConnection(async conn => {
+      const pkColumns = columns.filter(c => c.primaryKey).map(c => `\`${c.name}\``)
+
+      const colDefs = columns.map(col => {
+        let def = `\`${col.name}\` ${col.type}`
+        if (col.length) def += `(${col.length})`
+        if (!col.nullable) def += ' NOT NULL'
+        else def += ' NULL'
+        if (col.autoIncrement) def += ' AUTO_INCREMENT'
+        if (col.defaultValue !== undefined && col.defaultValue !== '') {
+          def += ` DEFAULT '${col.defaultValue}'`
+        }
+        if (col.comment) def += ` COMMENT '${col.comment}'`
+        return def
+      })
+
+      if (pkColumns.length > 0) {
+        colDefs.push(`PRIMARY KEY (${pkColumns.join(', ')})`)
+      }
+
+      let sql = `CREATE TABLE \`${tableName}\` (\n  ${colDefs.join(',\n  ')}\n)`
+      sql += ` ENGINE=${engine} DEFAULT CHARSET=${charset}`
+      if (comment) sql += ` COMMENT='${comment}'`
+
+      await conn.query(sql)
+    }, database)
+  }
+
+  async getTablePrimaryKey(database: string, table: string): Promise<string[]> {
+    return this.withConnection(async conn => {
+      const [rows] = await conn.query<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY'
+         ORDER BY ORDINAL_POSITION`,
+        [database, table]
+      )
+      return rows.map(r => r.COLUMN_NAME as string)
+    }, database)
+  }
+
+  // Paginated table data with optional text search
+  async getTableData(
+    database: string,
+    table: string,
+    page = 1,
+    pageSize = 100,
+    orderBy?: string,
+    orderDir: 'ASC' | 'DESC' = 'ASC',
+    search?: string
+  ): Promise<TableDataResult> {
+    return this.withConnection(async conn => {
+      const [colRows] = await conn.query<RowDataPacket[]>(`DESCRIBE \`${table}\``)
+      const columns: ColumnInfo[] = colRows.map(r => ({
+        name: r['Field'] as string,
+        type: r['Type'] as string,
+        nullable: r['Null'] === 'YES',
+        key: (r['Key'] as string) || '',
+        defaultValue: r['Default'] as string | null,
+        extra: (r['Extra'] as string) || ''
+      }))
+
+      const pkCols = columns.filter(c => c.key === 'PRI').map(c => c.name)
+
+      let whereClause = ''
+      const searchParams: unknown[] = []
+      if (search?.trim()) {
+        const textCols = columns.filter(c => /char|text|varchar|enum|set/i.test(c.type))
+        if (textCols.length > 0) {
+          whereClause = 'WHERE ' + textCols.map(c => `\`${c.name}\` LIKE ?`).join(' OR ')
+          textCols.forEach(() => searchParams.push(`%${search}%`))
+        }
+      }
+
+      const [countRows] = await conn.query<RowDataPacket[]>(
+        `SELECT COUNT(*) as total FROM \`${table}\` ${whereClause}`,
+        searchParams
+      )
+      const total = countRows[0].total as number
+
+      let dataSql = `SELECT * FROM \`${table}\` ${whereClause}`
+      if (orderBy) dataSql += ` ORDER BY \`${orderBy}\` ${orderDir}`
+      dataSql += ` LIMIT ? OFFSET ?`
+
+      const [rows] = await conn.query<RowDataPacket[]>(dataSql, [
+        ...searchParams,
+        pageSize,
+        (page - 1) * pageSize
+      ])
+
+      return {
+        columns,
+        rows: rows as Record<string, unknown>[],
+        total,
+        page,
+        pageSize,
+        primaryKeys: pkCols
+      }
+    }, database)
+  }
+
+  async insertRow(
+    database: string,
+    table: string,
+    row: Record<string, unknown>
+  ): Promise<{ affectedRows: number; insertId: number }> {
+    return this.withConnection(async conn => {
+      const cols = Object.keys(row).filter(k => row[k] !== undefined)
+      const vals = cols.map(k => (row[k] === '' ? null : row[k]))
+      const placeholders = cols.map(() => '?').join(', ')
+      const sql = `INSERT INTO \`${table}\` (${cols.map(c => `\`${c}\``).join(', ')}) VALUES (${placeholders})`
+      const [result] = await conn.query<ResultSetHeader>(sql, vals)
+      return { affectedRows: result.affectedRows, insertId: result.insertId }
+    }, database)
+  }
+
+  async updateRow(
+    database: string,
+    table: string,
+    primaryKeyValues: Record<string, unknown>,
+    changes: Record<string, unknown>
+  ): Promise<{ affectedRows: number }> {
+    return this.withConnection(async conn => {
+      const setCols = Object.keys(changes)
+      const setVals = setCols.map(k => (changes[k] === '' ? null : changes[k]))
+      const pkCols = Object.keys(primaryKeyValues)
+      const pkVals = pkCols.map(k => primaryKeyValues[k])
+
+      const setClauses = setCols.map(c => `\`${c}\` = ?`).join(', ')
+      const whereClauses = pkCols.map(c => `\`${c}\` = ?`).join(' AND ')
+      const sql = `UPDATE \`${table}\` SET ${setClauses} WHERE ${whereClauses} LIMIT 1`
+      const [result] = await conn.query<ResultSetHeader>(sql, [...setVals, ...pkVals])
+      return { affectedRows: result.affectedRows }
+    }, database)
+  }
+
+  async deleteRow(
+    database: string,
+    table: string,
+    primaryKeyValues: Record<string, unknown>
+  ): Promise<{ affectedRows: number }> {
+    return this.withConnection(async conn => {
+      const pkCols = Object.keys(primaryKeyValues)
+      const pkVals = pkCols.map(k => primaryKeyValues[k])
+      const whereClauses = pkCols.map(c => `\`${c}\` = ?`).join(' AND ')
+      const sql = `DELETE FROM \`${table}\` WHERE ${whereClauses} LIMIT 1`
+      const [result] = await conn.query<ResultSetHeader>(sql, pkVals)
+      return { affectedRows: result.affectedRows }
+    }, database)
   }
 
   // Change MySQL user password via SSH command (works even without .env DB config)
