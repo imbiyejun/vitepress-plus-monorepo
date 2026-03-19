@@ -99,6 +99,15 @@ const router = createRouter({
             title: '数据库管理',
             icon: 'DatabaseOutlined'
           }
+        },
+        {
+          path: 'chat',
+          name: 'chat',
+          component: () => import('../views/chat/ChatManager.vue'),
+          meta: {
+            title: 'AI 对话',
+            icon: 'RobotOutlined'
+          }
         }
       ]
     },

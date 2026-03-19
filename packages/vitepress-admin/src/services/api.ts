@@ -1,4 +1,5 @@
 import http from '@/utils/request'
+import { API_BASE_URL } from '@/config'
 
 // Common types
 export interface ImageInfo {
@@ -709,4 +710,115 @@ export const databaseApi = {
       },
       { showSuccess: true }
     )
+}
+
+// ========== Chat Types ==========
+export type ChatRole = 'system' | 'user' | 'assistant'
+
+export interface ChatMessage {
+  role: ChatRole
+  content: string
+  timestamp?: number
+}
+
+export interface ChatConversation {
+  id: string
+  title: string
+  messages: ChatMessage[]
+  provider: string
+  model: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ProviderInfo {
+  id: string
+  label: string
+  configured: boolean
+  models: string[]
+  defaultModel: string
+}
+
+export interface ChatStatus {
+  configured: boolean
+  providers: ProviderInfo[]
+  activeProvider: string
+  activeModel: string
+}
+
+export interface ChatStreamChunk {
+  content: string
+  done: boolean
+  conversationId?: string
+  error?: string
+}
+
+// ========== Chat API ==========
+export const chatApi = {
+  getStatus: () => http.get<ChatStatus>('/chat/status'),
+
+  getProviders: () => http.get<{ providers: ProviderInfo[] }>('/chat/providers'),
+
+  listConversations: () => http.get<{ conversations: ChatConversation[] }>('/chat/conversations'),
+
+  getConversation: (id: string) => http.get<ChatConversation>(`/chat/conversations/${id}`),
+
+  deleteConversation: (id: string) =>
+    http.delete(`/chat/conversations/${id}`, { showSuccess: true }),
+
+  updateTitle: (id: string, title: string) =>
+    http.put(`/chat/conversations/${id}/title`, { title }),
+
+  async sendMessage(
+    message: string,
+    options?: { conversationId?: string; provider?: string; model?: string },
+    onChunk?: (chunk: ChatStreamChunk) => void
+  ): Promise<string | undefined> {
+    const response = await fetch(`${API_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        conversationId: options?.conversationId,
+        provider: options?.provider,
+        model: options?.model
+      })
+    })
+
+    if (!response.ok) {
+      const err = await response.json()
+      throw new Error(err.error || 'Request failed')
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) throw new Error('No response stream')
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let resultConvId: string | undefined
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || !trimmed.startsWith('data:')) continue
+
+        try {
+          const data: ChatStreamChunk = JSON.parse(trimmed.slice(5).trim())
+          if (data.conversationId) resultConvId = data.conversationId
+          onChunk?.(data)
+        } catch {
+          // skip
+        }
+      }
+    }
+
+    return resultConvId
+  }
 }

@@ -4,6 +4,8 @@ export * from './common.js'
 export * from './topic.js'
 export * from './server.js'
 
+export * from './chat.js'
+
 // Image types - selectively export to avoid conflicts
 export type {
   QiniuConfig,
