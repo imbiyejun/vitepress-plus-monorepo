@@ -822,3 +822,13 @@ export const chatApi = {
     return resultConvId
   }
 }
+
+// ========== Translate Types ==========
+export interface TranslateSlugResponse {
+  slug: string
+}
+
+// ========== Translate API ==========
+export const translateApi = {
+  toSlug: (text: string) => http.post<TranslateSlugResponse>('/translate/to-slug', { text })
+}

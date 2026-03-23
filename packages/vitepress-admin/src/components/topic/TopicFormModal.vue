@@ -37,10 +37,10 @@
         :help="validationState.slugError"
         required
       >
-        <a-input
-          v-model:value="formData.slug"
+        <slug-input
+          v-model="formData.slug"
+          :source-text="formData.name"
           placeholder="请输入专题标识（英文或拼音）"
-          autocomplete="off"
           :disabled="mode === 'edit'"
           :status="validationState.slugError ? 'error' : ''"
         />
@@ -84,6 +84,7 @@ import { ref, defineProps, defineEmits, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import type { Category, Topic } from '@/types/topic'
 import ImageUploader from '@/components/common/ImageUploader.vue'
+import SlugInput from '@/components/common/SlugInput.vue'
 
 const props = defineProps<{
   modelValue: boolean

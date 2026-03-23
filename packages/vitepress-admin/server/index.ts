@@ -11,6 +11,7 @@ import deployRoutes from './routes/deployRoutes.js'
 import serverRoutes from './routes/serverRoutes.js'
 import databaseRoutes from './routes/databaseRoutes.js'
 import chatRoutes from './routes/chatRoutes.js'
+import translateRoutes from './routes/translateRoutes.js'
 import { fileWatcher } from './services/watcher.js'
 import { deployService } from './controllers/deploy/index.js'
 import { serverService } from './services/serverService.js'
@@ -90,6 +91,7 @@ app.use('/api/deploy', deployRoutes)
 app.use('/api/server', serverRoutes)
 app.use('/api/database', databaseRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/translate', translateRoutes)
 
 // Integrate Vite in development mode
 async function setupVite(): Promise<void> {

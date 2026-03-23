@@ -300,11 +300,13 @@
                                 :validate-status="article.slugError ? 'error' : ''"
                                 :help="article.slugError"
                               >
-                                <a-input
-                                  v-model:value="article.slug"
+                                <slug-input
+                                  v-model="article.slug"
+                                  :source-text="article.title"
                                   placeholder="请输入文章标识"
-                                  class="article-slug-input"
                                   size="small"
+                                  class="article-slug-input"
+                                  :status="article.slugError ? 'error' : ''"
                                 />
                               </a-form-item>
                             </div>
@@ -393,6 +395,7 @@ import {
 import { message, Modal } from 'ant-design-vue'
 import { h } from 'vue'
 import ImageUploader from '@/components/common/ImageUploader.vue'
+import SlugInput from '@/components/common/SlugInput.vue'
 
 interface Article {
   id: string

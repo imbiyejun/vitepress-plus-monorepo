@@ -5,6 +5,9 @@ import { aabbTopic } from './aabb'
 import { ccTopic } from './cc'
 import { jjTopic } from './jj'
 import { hhhTopic } from './hhh'
+import { criminalLawTopic } from './criminal-law'
+import { ddDdTopic } from './dd-dd'
+import { darkTopicsTopic } from './dark-topics'
 
 export const topicsData: TopicsData = {
   vue: vueTopic,
@@ -12,7 +15,10 @@ export const topicsData: TopicsData = {
   aabb: aabbTopic,
   cc: ccTopic,
   jj: jjTopic,
-  hhh: hhhTopic
+  hhh: hhhTopic,
+  'dd-dd': ddDdTopic,
+  'criminal-law': criminalLawTopic,
+  'dark-topics': darkTopicsTopic
 }
 
 export type { Article, Chapter, Topic, TopicsData } from './types'

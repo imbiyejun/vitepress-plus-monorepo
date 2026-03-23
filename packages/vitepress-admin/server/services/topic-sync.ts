@@ -24,6 +24,11 @@ const getTopicsDir = () => getTopicsPath()
 const getTopicsDataDir = () => getTopicsDataPath()
 const getTopicsConfigDir = () => getTopicsConfigPath()
 
+// Convert slug to valid JS variable name (e.g., "criminal-law" -> "criminalLaw")
+const slugToVarName = (slug: string): string => {
+  return slug.replace(/-([a-z])/g, (_, char) => char.toUpperCase())
+}
+
 // 更新专题的Markdown文件 (reserved for future use)
 
 async function _updateTopicMarkdown(topic: Topic) {
@@ -64,11 +69,12 @@ async function _updateTopicMarkdown(topic: Topic) {
 
 async function _updateTopicData(topic: Topic) {
   const filePath = join(getTopicsDataDir(), topic.slug, 'index.ts')
+  const varName = slugToVarName(topic.slug)
 
   // 构建数据内容
   const content = `import { Topic } from '../types'
 
-export const ${topic.slug}Topic: Topic = ${JSON.stringify(topic, null, 2)}
+export const ${varName}Topic: Topic = ${JSON.stringify(topic, null, 2)}
 `
 
   // 确保目录存在
@@ -84,14 +90,16 @@ export const ${topic.slug}Topic: Topic = ${JSON.stringify(topic, null, 2)}
 // 更新主数据文件
 async function updateMainDataFile(topic: Topic) {
   const mainDataPath = join(getTopicsDataDir(), 'index.ts')
+  const varName = slugToVarName(topic.slug)
+  const keyPattern = topic.slug.includes('-') ? `'${topic.slug}'` : topic.slug
 
   try {
     const content = await fs.readFile(mainDataPath, 'utf-8')
 
     const importRegex = new RegExp(
-      `import\\s*{\\s*${topic.slug}Topic\\s*}\\s*from\\s*'./${topic.slug}'`
+      `import\\s*{\\s*${varName}Topic\\s*}\\s*from\\s*'./${topic.slug}'`
     )
-    const topicRegex = new RegExp(`${topic.slug}:\\s*${topic.slug}Topic`)
+    const topicRegex = new RegExp(`['"]?${topic.slug}['"]?:\\s*${varName}Topic`)
 
     let newContent = content
 
@@ -100,10 +108,10 @@ async function updateMainDataFile(topic: Topic) {
       const lastImportMatch = content.match(/^import .+ from ['"][^'"]+['"]\s*$/gm)
       if (lastImportMatch) {
         const lastImport = lastImportMatch[lastImportMatch.length - 1]
-        const importStatement = `import { ${topic.slug}Topic } from './${topic.slug}'`
+        const importStatement = `import { ${varName}Topic } from './${topic.slug}'`
         newContent = newContent.replace(lastImport, `${lastImport}\n${importStatement}`)
       } else {
-        newContent = `import { ${topic.slug}Topic } from './${topic.slug}'\n${newContent}`
+        newContent = `import { ${varName}Topic } from './${topic.slug}'\n${newContent}`
       }
     }
 
@@ -117,10 +125,10 @@ async function updateMainDataFile(topic: Topic) {
           if (trimmedContent) {
             // Has existing entries, append new one
             const entriesWithoutTrailingComma = trimmedContent.replace(/,\s*$/, '')
-            return `export const topicsData: TopicsData = {\n  ${entriesWithoutTrailingComma},\n  ${topic.slug}: ${topic.slug}Topic,\n}`
+            return `export const topicsData: TopicsData = {\n  ${entriesWithoutTrailingComma},\n  ${keyPattern}: ${varName}Topic,\n}`
           } else {
             // Empty object, add first entry
-            return `export const topicsData: TopicsData = {\n  ${topic.slug}: ${topic.slug}Topic,\n}`
+            return `export const topicsData: TopicsData = {\n  ${keyPattern}: ${varName}Topic,\n}`
           }
         }
       )
@@ -239,7 +247,8 @@ export const syncTopicData = async (topicData: Topic) => {
     }
 
     log.info('开始写入文件:', configPath)
-    const fileContent = `import { Topic } from '../types'\n\nexport const ${topicData.slug}Topic: Topic = ${formattedData}\n`
+    const varName = slugToVarName(topicData.slug)
+    const fileContent = `import { Topic } from '../types'\n\nexport const ${varName}Topic: Topic = ${formattedData}\n`
     try {
       await fs.writeFile(configPath, fileContent, 'utf-8')
     } catch (writeError) {

@@ -22,10 +22,10 @@
         />
       </a-form-item>
       <a-form-item name="slug" label="标识" :rules="categorySlugRules" required>
-        <a-input
-          v-model:value="formData.slug"
+        <slug-input
+          v-model="formData.slug"
+          :source-text="formData.name"
           placeholder="请输入专题大类标识（英文或拼音）"
-          autocomplete="off"
           :disabled="mode === 'edit'"
         />
       </a-form-item>
@@ -36,6 +36,7 @@
 <script setup lang="ts">
 import { ref, defineProps, defineEmits, watch } from 'vue'
 import type { Category } from '@/types/topic'
+import SlugInput from '@/components/common/SlugInput.vue'
 
 const props = defineProps<{
   modelValue: boolean

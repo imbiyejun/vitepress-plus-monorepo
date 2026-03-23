@@ -46,6 +46,11 @@ interface TopicData {
 const getTopicsConfigFile = () => join(getTopicsConfigPath(), 'index.ts')
 const getTopicsDataDir = () => getTopicsDataPath()
 
+// Convert slug to valid JS variable name (e.g., "criminal-law" -> "criminalLaw")
+const slugToVarName = (slug: string): string => {
+  return slug.replace(/-([a-z])/g, (_, char) => char.toUpperCase())
+}
+
 const readTopicsConfig = async (): Promise<TopicCategory[]> => {
   try {
     const configFile = getTopicsConfigFile()
@@ -403,6 +408,7 @@ export const addTopic = async (req: Request, res: Response): Promise<void> => {
 const generateTopicDataFile = async (topic: TopicItem): Promise<void> => {
   try {
     const topicDir = join(getTopicsDataDir(), topic.slug)
+    const varName = slugToVarName(topic.slug)
 
     // 创建专题目录
     await fs.mkdir(topicDir, { recursive: true })
@@ -410,7 +416,7 @@ const generateTopicDataFile = async (topic: TopicItem): Promise<void> => {
     // 生成专题数据内容
     const topicDataContent = `import { Topic } from '../types'
 
-export const ${topic.slug}Topic: Topic = {
+export const ${varName}Topic: Topic = {
   id: '${topic.slug}',
   categoryId: '${topic.categoryId}',
   name: '${topic.name}',
@@ -436,14 +442,15 @@ export const ${topic.slug}Topic: Topic = {
 const updateTopicsDataIndex = async (topicSlug: string) => {
   try {
     const indexFile = join(getTopicsDataDir(), 'index.ts')
+    const varName = slugToVarName(topicSlug)
 
     // 读取现有的索引文件
     let indexContent = await fs.readFile(indexFile, 'utf-8')
 
     // 检查是否已经导入了该专题
-    if (!indexContent.includes(`import { ${topicSlug}Topic } from './${topicSlug}'`)) {
+    if (!indexContent.includes(`import { ${varName}Topic } from './${topicSlug}'`)) {
       // 添加新的导入语句
-      const importStatement = `import { ${topicSlug}Topic } from './${topicSlug}'`
+      const importStatement = `import { ${varName}Topic } from './${topicSlug}'`
 
       // 在现有的导入语句后添加新的导入
       const importMatch = indexContent.match(/(import.*from.*\n)+/)
@@ -460,10 +467,11 @@ const updateTopicsDataIndex = async (topicSlug: string) => {
     if (topicsDataMatch) {
       const currentContent = topicsDataMatch[1]
       console.log(`当前topicsData内容: ${currentContent}`)
-      console.log(`检查是否包含 ${topicSlug}: ${topicSlug}Topic`)
+      console.log(`检查是否包含 '${topicSlug}': ${varName}Topic`)
 
-      // 检查是否已经存在该专题
-      if (!currentContent.includes(`${topicSlug}: ${topicSlug}Topic`)) {
+      // 检查是否已经存在该专题 (use quoted key for slugs with hyphens)
+      const keyPattern = topicSlug.includes('-') ? `'${topicSlug}'` : topicSlug
+      if (!currentContent.includes(`${keyPattern}: ${varName}Topic`)) {
         // 使用更可靠的方法：在最后一个属性后添加新属性
         const lines = currentContent.split('\n')
         const lastPropertyIndex = lines
@@ -472,7 +480,7 @@ const updateTopicsDataIndex = async (topicSlug: string) => {
             line: line.trim()
           }))
           .reverse()
-          .find(item => item.line.match(/^\w+:\s+\w+Topic,?$/))?.index
+          .find(item => item.line.match(/^['"]?[\w-]+['"]?:\s+\w+Topic,?$/))?.index
 
         if (lastPropertyIndex !== undefined && lastPropertyIndex !== -1) {
           // 在最后一个属性后插入新属性
@@ -486,7 +494,7 @@ const updateTopicsDataIndex = async (topicSlug: string) => {
           }
 
           // 插入新属性（新属性后面不加逗号，因为它是最后一个）
-          lines.splice(lastPropertyIndex + 1, 0, `  ${topicSlug}: ${topicSlug}Topic`)
+          lines.splice(lastPropertyIndex + 1, 0, `  ${keyPattern}: ${varName}Topic`)
           const newTopicsDataContent = lines.join('\n')
           console.log(`新的topicsData内容: ${newTopicsDataContent}`)
           indexContent = indexContent.replace(
