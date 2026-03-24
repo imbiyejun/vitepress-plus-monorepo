@@ -186,11 +186,14 @@
                                 </div>
                               </div>
                               <div class="article-slug-row">
-                                <a-input
+                                <slug-input
                                   v-if="article.slugEditing"
-                                  v-model:value="article.slug"
+                                  v-model="article.slug"
+                                  :source-text="article.title"
+                                  placeholder="请输入文章标识"
                                   size="small"
                                   class="article-slug-input"
+                                  :status="article.slugError ? 'error' : ''"
                                   @pressEnter="handleArticleSlugSave(article)"
                                   @blur="handleArticleSlugSave(article)"
                                   ref="articleSlugInput"

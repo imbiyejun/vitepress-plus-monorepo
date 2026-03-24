@@ -26,6 +26,13 @@ export const darkTopicsTopic: Topic = {
           slug: 'test-article-1',
           summary: '发阿斯蒂芬',
           status: 'planned'
+        },
+        {
+          id: '1.3',
+          title: '我是-小火龙',
+          slug: 'im-charmander',
+          summary: '',
+          status: 'planned'
         }
       ]
     }

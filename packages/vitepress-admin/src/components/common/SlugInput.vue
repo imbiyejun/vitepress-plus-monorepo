@@ -8,12 +8,15 @@
     :size="size"
     autocomplete="off"
     @update:value="handleInput"
+    @pressEnter="emit('pressEnter', $event)"
+    @blur="emit('blur', $event)"
   >
     <template #suffix>
       <a-tooltip :title="generating ? '正在生成...' : '自动生成标识'">
         <span
           class="generate-icon"
           :class="{ generating, disabled: disabled || !sourceText }"
+          @mousedown.prevent
           @click="handleGenerate"
         >
           <ThunderboltOutlined :class="{ 'icon-pulse': generating }" />
@@ -48,6 +51,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'generated', value: string): void
+  (e: 'pressEnter', event: KeyboardEvent): void
+  (e: 'blur', event: Event): void
 }>()
 
 const inputRef = ref<{ focus: () => void } | null>(null)
