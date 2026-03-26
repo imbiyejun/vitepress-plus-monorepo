@@ -6,7 +6,8 @@ import {
   getConversation,
   deleteConversation,
   updateConversationTitle,
-  chatCompletion
+  chatCompletion,
+  generateNote
 } from '../controllers/chat/index.js'
 
 const router: express.Router = express.Router()
@@ -18,5 +19,6 @@ router.get('/conversations/:id', getConversation)
 router.delete('/conversations/:id', deleteConversation)
 router.put('/conversations/:id/title', updateConversationTitle)
 router.post('/completions', chatCompletion)
+router.post('/notes/generate', generateNote)
 
 export default router

@@ -1,9 +1,16 @@
 export type ChatRole = 'system' | 'user' | 'assistant'
 
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
 export interface ChatMessage {
   role: ChatRole
   content: string
   timestamp?: number
+  tokenUsage?: TokenUsage
 }
 
 export interface Conversation {
@@ -14,6 +21,7 @@ export interface Conversation {
   model: string
   createdAt: number
   updatedAt: number
+  totalTokens: number
 }
 
 // Per-provider env config
@@ -24,6 +32,11 @@ export interface ProviderEnvConfig {
   baseUrl: string
   models: string[]
   defaultModel: string
+}
+
+export interface ModelTokenLimit {
+  model: string
+  maxTokens: number
 }
 
 export interface ChatStatusResponse {
@@ -39,6 +52,7 @@ export interface ProviderInfo {
   configured: boolean
   models: string[]
   defaultModel: string
+  modelTokenLimits: ModelTokenLimit[]
 }
 
 export interface ChatCompletionRequest {
@@ -52,6 +66,7 @@ export interface ChatCompletionChunk {
   id: string
   content: string
   done: boolean
+  usage?: TokenUsage
 }
 
 export interface AIProviderConfig {
@@ -67,4 +82,36 @@ export interface AIProvider {
     model: string,
     onChunk: (chunk: ChatCompletionChunk) => void
   ): Promise<void>
+}
+
+// Note generation
+export interface GenerateNoteRequest {
+  conversationId: string
+}
+
+export interface NoteClassification {
+  categoryTitle: string
+  categorySlug: string
+  topicName: string
+  topicSlug: string
+  topicDescription: string
+  articleTitle: string
+  articleSlug: string
+  articleDescription: string
+}
+
+export type NoteProgressStep =
+  | 'analyzing'
+  | 'classified'
+  | 'generating'
+  | 'saving'
+  | 'done'
+  | 'error'
+
+export interface NoteProgressEvent {
+  step: NoteProgressStep
+  message?: string
+  content?: string
+  classification?: NoteClassification
+  filePath?: string
 }

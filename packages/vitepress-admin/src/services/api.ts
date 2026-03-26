@@ -715,10 +715,22 @@ export const databaseApi = {
 // ========== Chat Types ==========
 export type ChatRole = 'system' | 'user' | 'assistant'
 
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+export interface ModelTokenLimit {
+  model: string
+  maxTokens: number
+}
+
 export interface ChatMessage {
   role: ChatRole
   content: string
   timestamp?: number
+  tokenUsage?: TokenUsage
 }
 
 export interface ChatConversation {
@@ -729,6 +741,7 @@ export interface ChatConversation {
   model: string
   createdAt: number
   updatedAt: number
+  totalTokens: number
 }
 
 export interface ProviderInfo {
@@ -737,6 +750,7 @@ export interface ProviderInfo {
   configured: boolean
   models: string[]
   defaultModel: string
+  modelTokenLimits: ModelTokenLimit[]
 }
 
 export interface ChatStatus {
@@ -751,6 +765,35 @@ export interface ChatStreamChunk {
   done: boolean
   conversationId?: string
   error?: string
+  tokenUsage?: TokenUsage
+  totalTokens?: number
+}
+
+export interface NoteClassification {
+  categoryTitle: string
+  categorySlug: string
+  topicName: string
+  topicSlug: string
+  topicDescription: string
+  articleTitle: string
+  articleSlug: string
+  articleDescription: string
+}
+
+export type NoteProgressStep =
+  | 'analyzing'
+  | 'classified'
+  | 'generating'
+  | 'saving'
+  | 'done'
+  | 'error'
+
+export interface NoteProgressEvent {
+  step: NoteProgressStep
+  message?: string
+  content?: string
+  classification?: NoteClassification
+  filePath?: string
 }
 
 // ========== Chat API ==========
@@ -820,6 +863,48 @@ export const chatApi = {
     }
 
     return resultConvId
+  },
+
+  async generateNote(
+    conversationId: string,
+    onProgress?: (event: NoteProgressEvent) => void
+  ): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/chat/notes/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId })
+    })
+
+    if (!response.ok) {
+      const err = await response.json()
+      throw new Error(err.error || 'Request failed')
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) throw new Error('No response stream')
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || !trimmed.startsWith('data:')) continue
+        try {
+          const data: NoteProgressEvent = JSON.parse(trimmed.slice(5).trim())
+          onProgress?.(data)
+        } catch {
+          // skip
+        }
+      }
+    }
   }
 }
 

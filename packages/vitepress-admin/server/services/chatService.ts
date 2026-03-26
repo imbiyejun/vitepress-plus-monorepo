@@ -6,7 +6,9 @@ import type {
   Conversation,
   ProviderEnvConfig,
   ProviderInfo,
-  ChatStatusResponse
+  ChatStatusResponse,
+  TokenUsage,
+  ModelTokenLimit
 } from '../types/chat.js'
 
 // OpenAI-compatible streaming response types (DeepSeek, Qwen, Kimi all use this)
@@ -15,9 +17,48 @@ interface StreamChoice {
   finish_reason: string | null
 }
 
+interface StreamUsage {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+}
+
 interface StreamChunk {
   id: string
   choices: StreamChoice[]
+  usage?: StreamUsage
+}
+
+// Known model context-window sizes (tokens)
+const MODEL_TOKEN_LIMITS: Record<string, number> = {
+  'deepseek-chat': 65536,
+  'deepseek-reasoner': 65536,
+  'qwen-plus': 131072,
+  'qwen-turbo': 131072,
+  'qwen-max': 32768,
+  'qwen-long': 10000000,
+  'moonshot-v1-8k': 8192,
+  'moonshot-v1-32k': 32768,
+  'moonshot-v1-128k': 131072
+}
+
+// Rough token estimator: ~1.5 chars/token for CJK, ~4 chars/token for latin
+export function estimateTokens(text: string): number {
+  let cjk = 0
+  let latin = 0
+  for (const ch of text) {
+    if (ch.charCodeAt(0) > 0x2e80) cjk++
+    else latin++
+  }
+  return Math.ceil(cjk / 1.5 + latin / 4)
+}
+
+export function getModelMaxTokens(model: string): number {
+  return MODEL_TOKEN_LIMITS[model] || 65536
+}
+
+export function getModelTokenLimits(models: string[]): ModelTokenLimit[] {
+  return models.map(m => ({ model: m, maxTokens: MODEL_TOKEN_LIMITS[m] || 65536 }))
 }
 
 // All three providers use OpenAI-compatible API format
@@ -38,7 +79,8 @@ class OpenAICompatibleProvider implements AIProvider {
     const payload = {
       model: model || this.config.model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
-      stream: true
+      stream: true,
+      stream_options: { include_usage: true }
     }
 
     const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
@@ -82,8 +124,19 @@ class OpenAICompatibleProvider implements AIProvider {
         try {
           const parsed: StreamChunk = JSON.parse(data)
           const content = parsed.choices?.[0]?.delta?.content || ''
-          if (content) {
-            onChunk({ id: parsed.id, content, done: false })
+
+          // Extract usage from final chunk if provider supports it
+          let usage: TokenUsage | undefined
+          if (parsed.usage) {
+            usage = {
+              promptTokens: parsed.usage.prompt_tokens || 0,
+              completionTokens: parsed.usage.completion_tokens || 0,
+              totalTokens: parsed.usage.total_tokens || 0
+            }
+          }
+
+          if (content || usage) {
+            onChunk({ id: parsed.id, content: content || '', done: false, usage })
           }
         } catch {
           // skip malformed chunks
@@ -141,13 +194,22 @@ class ChatService {
   getProviderInfoList(): ProviderInfo[] {
     return Object.keys(PROVIDER_DEFS).map(id => {
       const cfg = this.getProviderEnvConfig(id)
-      if (!cfg) return { id, label: id, configured: false, models: [], defaultModel: '' }
+      if (!cfg)
+        return {
+          id,
+          label: id,
+          configured: false,
+          models: [],
+          defaultModel: '',
+          modelTokenLimits: []
+        }
       return {
         id,
         label: cfg.label,
         configured: !!cfg.apiKey,
         models: cfg.models,
-        defaultModel: cfg.defaultModel
+        defaultModel: cfg.defaultModel,
+        modelTokenLimits: getModelTokenLimits(cfg.models)
       }
     })
   }
@@ -204,7 +266,8 @@ class ChatService {
       provider,
       model,
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      totalTokens: 0
     }
     this.conversations.set(id, conversation)
     return conversation
@@ -239,7 +302,7 @@ class ChatService {
     requestProvider?: string,
     requestModel?: string,
     onChunk?: (chunk: ChatCompletionChunk) => void
-  ): Promise<{ conversationId: string }> {
+  ): Promise<{ conversationId: string; tokenUsage: TokenUsage }> {
     const { providerId, model } = this.resolveProviderAndModel(requestProvider, requestModel)
 
     let conv: Conversation
@@ -251,7 +314,8 @@ class ChatService {
       conv = this.createConversation(providerId, model)
     }
 
-    conv.messages.push({ role: 'user', content: message, timestamp: Date.now() })
+    const userMsg: ChatMessage = { role: 'user', content: message, timestamp: Date.now() }
+    conv.messages.push(userMsg)
     conv.updatedAt = Date.now()
 
     if (conv.messages.filter(m => m.role === 'user').length === 1) {
@@ -260,22 +324,38 @@ class ChatService {
 
     const provider = this.getProvider(providerId)
     let assistantContent = ''
+    let streamUsage: TokenUsage | undefined
 
     await provider.chat(conv.messages, model, chunk => {
       if (!chunk.done) {
         assistantContent += chunk.content
+        if (chunk.usage) streamUsage = chunk.usage
       }
       onChunk?.(chunk)
     })
 
+    // Use API-reported usage or fall back to estimation
+    const turnUsage: TokenUsage = streamUsage || {
+      promptTokens: conv.messages.reduce((s, m) => s + estimateTokens(m.content), 0),
+      completionTokens: estimateTokens(assistantContent),
+      totalTokens: 0
+    }
+    if (!streamUsage) {
+      turnUsage.totalTokens = turnUsage.promptTokens + turnUsage.completionTokens
+    }
+
+    userMsg.tokenUsage = turnUsage
+
     conv.messages.push({
       role: 'assistant',
       content: assistantContent,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      tokenUsage: turnUsage
     })
+    conv.totalTokens += turnUsage.totalTokens
     conv.updatedAt = Date.now()
 
-    return { conversationId: conv.id }
+    return { conversationId: conv.id, tokenUsage: turnUsage }
   }
 }
 

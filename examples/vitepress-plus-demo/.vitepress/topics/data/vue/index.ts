@@ -33,6 +33,14 @@ export const vueTopic: Topic = {
           slug: 'vue-computed-watch',
           summary: '深入理解Vue.js的计算属性和侦听器的使用',
           status: 'draft'
+        },
+        {
+          id: '1.4',
+          title: '在Vue与Express网站中集成代码仓库分析功能',
+          slug: 'integrate-code-repository-analysis-in-vue-express-website',
+          summary:
+            '探讨如何在基于Vue和Express的AI聊天框网站中引入外部代码仓库并分析其内容，实现类似Cursor的智能代码理解和文档生成功能。',
+          status: 'completed'
         }
       ]
     },
