@@ -10,6 +10,7 @@ import type {
   TokenUsage,
   ModelTokenLimit
 } from '../types/chat.js'
+import { loadConversations, saveConversations, flushSave } from './chatStorage.js'
 
 // OpenAI-compatible streaming response types (DeepSeek, Qwen, Kimi all use this)
 interface StreamChoice {
@@ -175,6 +176,17 @@ const PROVIDER_DEFS: Record<
 
 class ChatService {
   private conversations = new Map<string, Conversation>()
+  private initialized = false
+
+  async init(): Promise<void> {
+    if (this.initialized) return
+    this.conversations = await loadConversations()
+    this.initialized = true
+  }
+
+  private persist(): void {
+    saveConversations(this.conversations)
+  }
 
   // Read env config for a specific provider
   private getProviderEnvConfig(providerId: string): ProviderEnvConfig | null {
@@ -270,6 +282,7 @@ class ChatService {
       totalTokens: 0
     }
     this.conversations.set(id, conversation)
+    this.persist()
     return conversation
   }
 
@@ -284,7 +297,9 @@ class ChatService {
   }
 
   deleteConversation(id: string): boolean {
-    return this.conversations.delete(id)
+    const result = this.conversations.delete(id)
+    if (result) this.persist()
+    return result
   }
 
   updateConversationTitle(id: string, title: string): Conversation | undefined {
@@ -292,6 +307,7 @@ class ChatService {
     if (conv) {
       conv.title = title
       conv.updatedAt = Date.now()
+      this.persist()
     }
     return conv
   }
@@ -354,9 +370,12 @@ class ChatService {
     })
     conv.totalTokens += turnUsage.totalTokens
     conv.updatedAt = Date.now()
+    this.persist()
 
     return { conversationId: conv.id, tokenUsage: turnUsage }
   }
 }
 
 export const chatService = new ChatService()
+
+export { flushSave as flushChatStorage }

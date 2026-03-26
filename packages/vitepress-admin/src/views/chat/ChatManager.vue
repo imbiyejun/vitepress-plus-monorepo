@@ -291,9 +291,11 @@ import {
   type NoteProgressStep
 } from '@/services/api'
 
+const STORAGE_KEY = 'chat_active_conversation'
+
 const chatStatus = ref<ChatStatus | null>(null)
 const conversations = ref<ChatConversation[]>([])
-const activeConversationId = ref<string>('')
+const activeConversationId = ref<string>(localStorage.getItem(STORAGE_KEY) || '')
 const messages = ref<ChatMessage[]>([])
 const inputMessage = ref('')
 const isStreaming = ref(false)
@@ -576,8 +578,24 @@ const handleGenerateNote = async () => {
 
 watch(messages, () => scrollToBottom(), { deep: true })
 
+watch(activeConversationId, id => {
+  if (id) {
+    localStorage.setItem(STORAGE_KEY, id)
+  } else {
+    localStorage.removeItem(STORAGE_KEY)
+  }
+})
+
 onMounted(async () => {
   await Promise.all([loadStatus(), loadConversations()])
+
+  // Restore last active conversation from localStorage
+  const savedId = activeConversationId.value
+  if (savedId && conversations.value.some(c => c.id === savedId)) {
+    await loadConversation(savedId)
+  } else {
+    activeConversationId.value = ''
+  }
 })
 </script>
 

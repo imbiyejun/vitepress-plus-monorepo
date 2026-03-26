@@ -73,3 +73,10 @@ export function getTopicsDataPath(): string {
 export function getTopicsConfigPath(): string {
   return path.join(getVitePressPath(), 'topics/config')
 }
+
+/**
+ * Get the admin data directory for persistent storage (e.g. chat history)
+ */
+export function getDataPath(): string {
+  return path.join(getVitePressPath(), 'admin-data')
+}

@@ -17,6 +17,7 @@ import { deployService } from './controllers/deploy/index.js'
 import { serverService } from './services/serverService.js'
 import { serverInitService } from './services/serverInitService.js'
 import { softwareService } from './services/softwareService.js'
+import { chatService, flushChatStorage } from './services/chatService.js'
 import type { TerminalMessage, InitMessage, SoftwareMessage } from './types/server.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -224,8 +225,17 @@ wss.on('connection', (ws: WebSocket) => {
   ws.on('error', console.error)
 })
 
+// Flush chat storage on graceful shutdown
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(sig, async () => {
+    await flushChatStorage()
+    process.exit(0)
+  })
+}
+
 // Start server
 async function startServer(): Promise<void> {
+  await chatService.init()
   await setupVite()
 
   server.listen(PORT, () => {

@@ -29,6 +29,7 @@ Thumbs.db
 # VitePress
 .vitepress/cache
 .vitepress/dist
+.vitepress/admin-data
 
 # Logs
 logs/
